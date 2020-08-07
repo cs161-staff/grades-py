@@ -1,6 +1,7 @@
 import datetime
 
 from assignment import Assignment
+from category import Category
 from typing import Dict, List
 
 class Multiplier:
@@ -39,7 +40,7 @@ class Student:
     def __repr__(self) -> str:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grade_possibilities)
 
-    def get_grade(self, assignments: Dict[str, Assignment]) -> float:
+    def get_grade(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> float:
         def get_grade_possibility(grade_possibility: Dict[str, AssignmentGrade]):
             total_grade = 0.0
             for grade in grade_possibility.values():
@@ -48,8 +49,9 @@ class Student:
                     # Ignore dropped grades
                     continue
                 assignment = assignments[grade.assignment_name]
+                category = categories[assignment.category]
                 assignment_score = grade.get_score() / assignment.score_possible
-                total_grade += assignment_score * assignment.weight
+                total_grade += assignment_score * assignment.weight * category.weight
             return total_grade
         total_grade_possibities = map(get_grade_possibility, self.grade_possibilities)
         total_grade = max(total_grade_possibities)

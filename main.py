@@ -39,10 +39,11 @@ def import_categories(path: str) -> Dict[str, Category]:
         reader = csv.DictReader(roster_file)
         for row in reader:
             name = row["Name"]
+            weight = float(row["Weight"])
             drops = int(row["Drops"])
             slip_days = int(row["Slip Days"])
             has_late_multiplier = bool(row["Has Late Multiplier"])
-            categories[name] = Category(name, drops, slip_days, has_late_multiplier)
+            categories[name] = Category(name, weight, drops, slip_days, has_late_multiplier)
     return categories
 
 def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, Assignment]:
@@ -284,7 +285,7 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 for grade_to_drop in grades_to_drop:
                     grade_to_drop.dropped = True
 
-def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
+def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Dumps students as a CSV to stdout
 
     :param students: The students to dump
@@ -294,7 +295,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     """
     print("SID,percentage")
     for student in students.values():
-        print("{},{}".format(student.sid, student.get_grade(assignments)))
+        print("{},{}".format(student.sid, student.get_grade(assignments, categories)))
 
 def main(args) -> None:
     roster_path = args.roster
@@ -315,7 +316,7 @@ def main(args) -> None:
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
 
-    dump_students(students, assignments)
+    dump_students(students, assignments, categories)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
