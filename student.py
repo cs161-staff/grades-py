@@ -43,15 +43,19 @@ class Student:
     def get_grade(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> float:
         def get_grade_possibility(grade_possibility: Dict[str, AssignmentGrade]):
             total_grade = 0.0
-            for grade in grade_possibility.values():
-                assert grade.assignment_name in assignments, "Graded assignment entry not in assignments"
-                if grade.dropped:
-                    # Ignore dropped grades
-                    continue
-                assignment = assignments[grade.assignment_name]
-                category = categories[assignment.category]
-                assignment_score = grade.get_score() / assignment.score_possible
-                total_grade += assignment_score * assignment.weight * category.weight
+            for category in categories.values():
+                assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
+                category_numerator = 0.0 # Weighted grades on assignments
+                category_denominator = 0.0 # Total assignment weights
+                for assignment in assignments_in_category:
+                    grade = grade_possibility[assignment.name]
+                    if grade.dropped:
+                        # Ignore dropped grades
+                        continue
+                    category_numerator += grade.get_score() / assignment.score_possible * assignment.weight
+                    category_denominator += assignment.weight
+                category_grade = category_numerator / category_denominator
+                total_grade += category_grade * category.weight
             return total_grade
         total_grade_possibities = map(get_grade_possibility, self.grade_possibilities)
         total_grade = max(total_grade_possibities)
