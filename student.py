@@ -12,10 +12,10 @@ class AssignmentGrade:
         return "AssignmentGrade('{}', {}, {})".format(self.assignment_name, self.score, repr(self.lateness))
 
 class Student:
-    def __init__(self, sid: int, name: str, grades: Dict[str, AssignmentGrade] = {}) -> None:
+    def __init__(self, sid: int, name: str, grades: Dict[str, AssignmentGrade] = None) -> None:
         self.sid = sid
         self.name = name
-        self.grades = grades
+        self.grades = {} if not grades else grades
 
     def __repr__(self) -> str:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grades)
