@@ -15,7 +15,7 @@ class Student:
     def __init__(self, sid: int, name: str, grades: Dict[str, AssignmentGrade] = None) -> None:
         self.sid = sid
         self.name = name
-        self.grades = {} if not grades else grades
+        self.grades: Dict[str, AssignmentGrade] = {} if not grades else grades
 
     def __repr__(self) -> str:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grades)
