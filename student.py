@@ -41,7 +41,9 @@ class Student:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grade_possibilities)
 
     def get_grade(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> float:
-        def get_grade_possibility(grade_possibility: Dict[str, AssignmentGrade]):
+        best_grade = -float('inf')
+        best_possibility: Dict[str, AssignmentGrade]
+        for grade_possibility in self.grade_possibilities:
             total_grade = 0.0
             for category in categories.values():
                 assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
@@ -56,7 +58,8 @@ class Student:
                     category_denominator += assignment.weight
                 category_grade = category_numerator / category_denominator
                 total_grade += category_grade * category.weight
-            return total_grade
-        total_grade_possibities = map(get_grade_possibility, self.grade_possibilities)
-        total_grade = max(total_grade_possibities)
-        return total_grade
+
+            if total_grade > best_grade:
+                best_grade = total_grade
+                best_possibility = grade_possibility
+        return best_grade
