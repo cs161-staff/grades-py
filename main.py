@@ -96,18 +96,28 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             grades: Dict[str, AssignmentGrade] = {}
             for assignment_name in assignments:
                 assignment_lateness_header = "{} - Lateness (H:M:S)".format(assignment_name)
+                assignment_max_points_header = "{} - Max Points".format(assignment_name)
 
-                if assignment_name not in row:
-                    # No column for assignment
-                    continue
-                scorestr = row[assignment_name]
-                if scorestr == "":
-                    # Empty string score string means no submission
-                    continue
-                score = float(scorestr)
-                # Lateness formatted as HH:MM:SS
-                lateness_components = row[assignment_lateness_header].split(":")
-                lateness = datetime.timedelta(hours=int(lateness_components[0]), minutes=int(lateness_components[1]), seconds= int(lateness_components[2]))
+                score: float
+                if assignment_name in row:
+                    scorestr = row[assignment_name]
+                    if scorestr != "":
+                        score = float(scorestr)
+                        # Lateness formatted as HH:MM:SS
+                        lateness_components = row[assignment_lateness_header].split(":")
+                        lateness = datetime.timedelta(hours=int(lateness_components[0]), minutes=int(lateness_components[1]), seconds= int(lateness_components[2]))
+
+                        # Take min with max score possible on Gradescope
+                        max_score = float(row[assignment_max_points_header])
+                        score = min(max_score, score)
+                    else:
+                        # Empty string score string means no submission; assume 0.0
+                        score = 0.0
+                        lateness = datetime.timedelta(0)
+                else:
+                    # No column for assignment; assume 0.0
+                    score = 0.0
+                    lateness = datetime.timedelta(0)
 
                 grade = AssignmentGrade(assignment_name, score, lateness)
                 grades[assignment_name] = grade
