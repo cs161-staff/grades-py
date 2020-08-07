@@ -1,5 +1,6 @@
 import datetime
 
+from assignment import Assignment
 from typing import Dict
 
 class AssignmentGrade:
@@ -19,3 +20,12 @@ class Student:
 
     def __repr__(self) -> str:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grades)
+
+    def get_grade(self, assignments: Dict[str, Assignment]) -> float:
+        total_grade = 0.0
+        for grade in self.grades.values():
+            assert grade.assignment_name in assignments, "Graded assignment entry not in assignments"
+            assignment = assignments[grade.assignment_name]
+            assignment_score = grade.score / assignment.score_possible
+            total_grade += assignment_score * assignment.weight
+        return total_grade

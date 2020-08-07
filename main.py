@@ -37,7 +37,9 @@ def import_assignments(path: str) -> Dict[str, Assignment]:
         reader = csv.DictReader(assignment_file)
         for row in reader:
             name = row["Name"]
-            assignments[name] = Assignment(name)
+            score_possible = float(row["Possible"])
+            weight = float(row["Weight"])
+            assignments[name] = Assignment(name, score_possible, weight)
     return assignments
 
 def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
@@ -68,6 +70,9 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             for assignment_name in assignments:
                 assignment_lateness_header = "{} - Lateness (H:M:S)".format(assignment_name)
 
+                if assignment_name not in row:
+                    # No column for assignment
+                    continue
                 scorestr = row[assignment_name]
                 if scorestr == "":
                     # Empty string score string means no submission
@@ -136,7 +141,7 @@ def main(args) -> None:
 
     apply_extensions(students, extensions)
 
-    print(students)
+    print(list(students.values())[0].get_grade(assignments))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
