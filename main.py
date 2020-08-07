@@ -67,6 +67,7 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
 
             student = students[sid]
 
+            grades: Dict[str, AssignmentGrade] = {}
             for assignment_name in assignments:
                 assignment_lateness_header = "{} - Lateness (H:M:S)".format(assignment_name)
 
@@ -83,7 +84,10 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
                 lateness = datetime.timedelta(hours=int(lateness_components[0]), minutes=int(lateness_components[1]), seconds= int(lateness_components[2]))
 
                 grade = AssignmentGrade(assignment_name, score, lateness)
-                student.grades[assignment_name] = grade
+                grades[assignment_name] = grade
+
+            # Upon importing, there is only one possibility so far
+            student.grade_possibilities = [grades]
 
 def import_extensions(path: str) -> List[Extension]:
     """Imports the CalCentral roster in the CSV file at the given path
@@ -108,7 +112,7 @@ def import_extensions(path: str) -> List[Extension]:
 def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) -> None:
     """Applies extensions to the students.
 
-    Extensions are applied by subtracting the length of the extension from the student's lateness for the assignment.
+    Extensions are applied by subtracting the length of the extension from the student's lateness for the assignment. There is only one possibility: that extensions are applied.
 
     :param students: The students to whom to apply the extensions
     :type students: dict
@@ -120,12 +124,13 @@ def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) 
             # Skip students not in roster
             continue
         student = students[extension.sid]
-        if extension.assignment_name not in student.grades:
-            # Skip assignments not in assignments list
-            # Assignment will not be in student.grades if not in assignment list
-            continue
-        grade = student.grades[extension.assignment_name]
-        grade.lateness = max(grade.lateness - extension.length, datetime.timedelta(0))
+        for grade_possibility in student.grade_possibilities:
+            if extension.assignment_name not in grade_possibility:
+                # Skip assignments not in assignments list
+                # Assignment will not be in student.grades if not in assignment list
+                return
+            grade = grade_possibility[extension.assignment_name]
+            grade.lateness = max(grade.lateness - extension.length, datetime.timedelta(0))
 
 def main(args) -> None:
     roster_path = args.roster
@@ -138,6 +143,8 @@ def main(args) -> None:
     import_grades(grades_path, students, assignments)
 
     extensions = import_extensions(extensions_path)
+
+    print(students)
 
     apply_extensions(students, extensions)
 
