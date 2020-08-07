@@ -3,4 +3,4 @@ class Assignment:
         self.name = name
 
     def __repr__(self) -> str:
-        return "Assignment(\"{}\")".format(self.name)
+        return "Assignment('{}')".format(self.name)

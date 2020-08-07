@@ -1,9 +1,10 @@
 import argparse
 import csv
+import datetime
 from typing import Dict
 
 from assignment import Assignment
-from student import Student
+from student import AssignmentGrade, Student
 
 def import_roster(path: str) -> Dict[int, Student]:
     """Imports the CalCentral roster in the CSV file at the given path
@@ -38,7 +39,7 @@ def import_assignments(path: str) -> Dict[str, Assignment]:
             assignments[name] = Assignment(name)
     return assignments
 
-def import_grades(path: str, students: Dict[int, Student]) -> None:
+def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
     """Imports the Gradescope grade rports in the CSV file at the given path and imports them into the students
 
     :param path: The path of the Gradescope grade rport
@@ -46,6 +47,33 @@ def import_grades(path: str, students: Dict[int, Student]) -> None:
     :param students: The students from `import_roster`
     :type students: list
     """
+    with open(path) as grades_file:
+        reader = csv.DictReader(grades_file)
+        for row in reader:
+            try:
+                sid = int(row["SID"])
+            except ValueError as e:
+                continue
+            if sid not in students:
+                # Skip students who aren't in the roster
+                continue
+
+            student = students[sid]
+
+            for assignment_name in assignments:
+                assignment_lateness_header = "{} - Lateness (H:M:S)".format(assignment_name)
+
+                scorestr = row[assignment_name]
+                if scorestr == "":
+                    # Empty string score string means no submission
+                    continue
+                score = float(scorestr)
+                # Lateness formatted as HH:MM:SS
+                lateness_components = row[assignment_lateness_header].split(":")
+                lateness = datetime.timedelta(hours=int(lateness_components[0]), minutes=int(lateness_components[1]), seconds= int(lateness_components[2]))
+
+                grade = AssignmentGrade(assignment_name, score, lateness)
+                student.grades[assignment_name] = grade
 
 def main(args) -> None:
     roster_path = args.roster
@@ -54,7 +82,7 @@ def main(args) -> None:
 
     students = import_roster(roster_path)
     assignments = import_assignments(assignments_path)
-    import_grades(grades_path, students)
+    import_grades(grades_path, students, assignments)
     print(students)
 
 if __name__ == "__main__":
