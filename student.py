@@ -20,6 +20,12 @@ class AssignmentGrade:
         self.slip_days_applied = slip_days_applied
         self.multipliers_applied: List[Multiplier] = multipliers_applied if multipliers_applied else []
 
+    def get_score(self) -> float:
+        score = self.score
+        for multiplier in self.multipliers_applied:
+            score *= multiplier.multiplier
+        return score
+
     def __repr__(self) -> str:
         return "AssignmentGrade('{}', {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied)
 
@@ -38,9 +44,7 @@ class Student:
             for grade in grade_possibility.values():
                 assert grade.assignment_name in assignments, "Graded assignment entry not in assignments"
                 assignment = assignments[grade.assignment_name]
-                assignment_score = grade.score / assignment.score_possible
-                for multiplier in grade.multipliers_applied:
-                    assignment_score *= multiplier.multiplier
+                assignment_score = grade.get_score() / assignment.score_possible
                 total_grade += assignment_score * assignment.weight
             return total_grade
         total_grade_possibities = map(get_grade_possibility, self.grade_possibilities)

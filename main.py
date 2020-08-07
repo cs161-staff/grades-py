@@ -248,6 +248,30 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
                         multiplier = 0.0
                     grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
 
+def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
+    """Applies drops per categories to students
+
+    Drops are applied by removing from each grade possibility dictionary the assignments with the lowest scores.
+
+    :param students: The students to whom to apply late multipliers
+    :type students: dict
+    :param assignments: The assignments
+    :type assignments: dict
+    :param categories: The assignment categories, containing numbers of drops
+    :type categories: dict
+    """
+    for category in categories.values():
+        assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
+        assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
+        for student in students.values():
+            for grade_possibility in student.grade_possibilities:
+                grades = list(grade_possibility.values())
+                grades = list(filter(lambda grade: grade.assignment_name in assignment_names, grades))
+                grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
+                grades_to_remove = grades[:category.drops]
+                for grade_to_remove in grades_to_remove:
+                    del grade_possibility[grade_to_remove.assignment_name]
+
 def main(args) -> None:
     roster_path = args.roster
     categories_path = args.categories
@@ -265,6 +289,7 @@ def main(args) -> None:
     apply_extensions(students, extensions)
     apply_slip_days(students, assignments, categories, {})
     apply_late_multiplier(students, assignments, categories)
+    apply_drops(students, assignments, categories)
 
     print(list(students.values())[0].get_grade(assignments))
 
