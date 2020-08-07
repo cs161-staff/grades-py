@@ -13,12 +13,13 @@ class Multiplier:
         return "Multiplier({}, '{}')".format(self.multiplier, self.description)
 
 class AssignmentGrade:
-    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, slip_days_applied: int = 0, multipliers_applied: List[Multiplier] = None) -> None:
+    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, slip_days_applied: int = 0, multipliers_applied: List[Multiplier] = None, dropped: bool = False) -> None:
         self.assignment_name = assignment_name
         self.score = score
         self.lateness = lateness
         self.slip_days_applied = slip_days_applied
         self.multipliers_applied: List[Multiplier] = multipliers_applied if multipliers_applied else []
+        self.dropped = dropped
 
     def get_score(self) -> float:
         score = self.score
@@ -27,7 +28,7 @@ class AssignmentGrade:
         return score
 
     def __repr__(self) -> str:
-        return "AssignmentGrade('{}', {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied)
+        return "AssignmentGrade('{}', {}, {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied, self.dropped)
 
 class Student:
     def __init__(self, sid: int, name: str, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:
@@ -43,6 +44,9 @@ class Student:
             total_grade = 0.0
             for grade in grade_possibility.values():
                 assert grade.assignment_name in assignments, "Graded assignment entry not in assignments"
+                if grade.dropped:
+                    # Ignore dropped grades
+                    continue
                 assignment = assignments[grade.assignment_name]
                 assignment_score = grade.get_score() / assignment.score_possible
                 total_grade += assignment_score * assignment.weight

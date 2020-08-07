@@ -263,7 +263,7 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
 def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Applies drops per categories to students
 
-    Drops are applied by removing from each grade possibility dictionary the assignments with the lowest scores.
+    Drops are applied by setting the dropped variable for the lowest assignments in each category.
 
     :param students: The students to whom to apply late multipliers
     :type students: dict
@@ -280,9 +280,9 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 grades = list(grade_possibility.values())
                 grades = list(filter(lambda grade: grade.assignment_name in assignment_names, grades))
                 grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
-                grades_to_remove = grades[:category.drops]
-                for grade_to_remove in grades_to_remove:
-                    del grade_possibility[grade_to_remove.assignment_name]
+                grades_to_drop = grades[:category.drops]
+                for grade_to_drop in grades_to_drop:
+                    grade_to_drop.dropped = True
 
 def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
     """Dumps students as a CSV to stdout
