@@ -4,13 +4,14 @@ from assignment import Assignment
 from typing import Dict, List
 
 class AssignmentGrade:
-    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta) -> None:
+    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, slip_days_applied: int = 0) -> None:
         self.assignment_name = assignment_name
         self.score = score
         self.lateness = lateness
+        self.slip_days_applied = slip_days_applied
 
     def __repr__(self) -> str:
-        return "AssignmentGrade('{}', {}, {})".format(self.assignment_name, self.score, repr(self.lateness))
+        return "AssignmentGrade('{}', {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied)
 
 class Student:
     def __init__(self, sid: int, name: str, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:

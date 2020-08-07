@@ -1,4 +1,5 @@
 import argparse
+import copy
 import csv
 import datetime
 from typing import Dict, List
@@ -156,6 +157,51 @@ def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) 
             grade = grade_possibility[extension.assignment_name]
             grade.lateness = max(grade.lateness - extension.length, datetime.timedelta(0))
 
+def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category], extra_slip_days: Dict[int, Dict[str, int]]) -> None:
+    """Applies slip days per category to students
+
+    Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments.
+
+    :param students: The students to whom to apply slip days
+    :type students: dict
+    :param assignments: The assignments
+    :type assignments: dict
+    :param categories: The assignment categories, containing numbers of slip days
+    :type categoires: dict
+    """
+    def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
+        # Basically np.meshgrid with max sum <= slip_days
+        # TODO Optimize by removing unnecessary slip day possiblities (e.g. only using 2 when you can use 3)
+        if num_assignments == 0:
+            return [[]]
+        possibilities: List[List[int]] = []
+        for i in range(slip_days + 1):
+            # i is the number of slip days used for the first assignment
+            rest = get_slip_possibilities(num_assignments - 1, slip_days - i)
+            rest = list(map(lambda possibility: [i] + possibility, rest))
+            possibilities.extend(rest)
+        return possibilities
+
+    for category in categories.values():
+        assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
+        slip_possibilities = get_slip_possibilities(len(assignments_in_category), category.slip_days)
+        for student in students.values():
+            # Shallow copy student.grade_possibilities for concurrent modification
+            for old_grade_possibility in list(student.grade_possibilities):
+                for slip_possibility in slip_possibilities:
+                    if sum(slip_possibility) == 0:
+                        # Skip 0 case, which is already present
+                        continue
+                    possibility_with_slip = copy.deepcopy(old_grade_possibility)
+                    for i in range(len(assignments_in_category)):
+                        assignment = assignments_in_category[i]
+                        slip_days = slip_possibility[i]
+                        if assignment.name not in possibility_with_slip:
+                            # Ignore non-present assignments in possibility
+                            continue
+                        possibility_with_slip[assignment.name].slip_days_applied = slip_days
+                    student.grade_possibilities.append(possibility_with_slip)
+
 def main(args) -> None:
     roster_path = args.roster
     categories_path = args.categories
@@ -170,9 +216,8 @@ def main(args) -> None:
 
     extensions = import_extensions(extensions_path)
 
-    print(students)
-
     apply_extensions(students, extensions)
+    apply_slip_days(students, assignments, categories, {})
 
     print(list(students.values())[0].get_grade(assignments))
 
