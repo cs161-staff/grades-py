@@ -4,6 +4,7 @@ import datetime
 from typing import Dict, List
 
 from assignment import Assignment
+from category import Category
 from extension import Extension
 from student import AssignmentGrade, Student
 
@@ -24,11 +25,31 @@ def import_roster(path: str) -> Dict[int, Student]:
             students[sid] = Student(sid, name)
     return students
 
-def import_assignments(path: str) -> Dict[str, Assignment]:
+def import_categories(path: str) -> Dict[str, Category]:
+    """Imports assignment categories the CSV file at the given path
+
+    :param path: The path of the category CSV
+    :type path: str
+    :returns: A dict mapping category names to categories
+    :rtype: dict
+    """
+    categories: Dict[str, Category] = {}
+    with open(path) as roster_file:
+        reader = csv.DictReader(roster_file)
+        for row in reader:
+            name = row["Name"]
+            drops = int(row["Drops"])
+            slip_days = int(row["Slip Days"])
+            categories[name] = Category(name, drops, slip_days)
+    return categories
+
+def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, Assignment]:
     """Imports assignments from the CSV file at the given path
 
     :param path: The path of the assignments CSV
     :type path: str
+    :param categories: The categories for assignments
+    :type categories: dict
     :returns: A dict mapping assignment names to assignments
     :rtype: dict
     """
@@ -37,9 +58,12 @@ def import_assignments(path: str) -> Dict[str, Assignment]:
         reader = csv.DictReader(assignment_file)
         for row in reader:
             name = row["Name"]
+            category = row["Category"]
             score_possible = float(row["Possible"])
             weight = float(row["Weight"])
-            assignments[name] = Assignment(name, score_possible, weight)
+            if category not in categories:
+                raise RuntimeError("Assignment {} references unknown category {}".format(name, category))
+            assignments[name] = Assignment(name, category, score_possible, weight)
     return assignments
 
 def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
@@ -134,12 +158,14 @@ def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) 
 
 def main(args) -> None:
     roster_path = args.roster
+    categories_path = args.categories
     assignments_path = args.assignments
     grades_path = args.grades
     extensions_path = args.extensions
 
     students = import_roster(roster_path)
-    assignments = import_assignments(assignments_path)
+    categories = import_categories(categories_path)
+    assignments = import_assignments(assignments_path, categories)
     import_grades(grades_path, students, assignments)
 
     extensions = import_extensions(extensions_path)
@@ -153,8 +179,9 @@ def main(args) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("roster", help="csv roster downloaded from CalCentral")
-    parser.add_argument("grades", help="csv grades from Gradescope")
+    parser.add_argument("categories", help="csv grades with assignment categories")
     parser.add_argument("assignments", help="csv with assignments")
+    parser.add_argument("grades", help="csv grades from Gradescope")
     parser.add_argument("extensions", help="csv grades with extensions")
     #parser.add_argument("output_path", help="path where csv output should be saved")
     parser.add_argument("--config", "--c", help="yaml file of configs")
