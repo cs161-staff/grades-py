@@ -7,7 +7,7 @@ from typing import Dict, List
 from assignment import Assignment
 from category import Category
 from extension import Extension
-from student import AssignmentGrade, Student
+from student import AssignmentGrade, Multiplier, Student
 
 def import_roster(path: str) -> Dict[int, Student]:
     """Imports the CalCentral roster in the CSV file at the given path
@@ -41,7 +41,8 @@ def import_categories(path: str) -> Dict[str, Category]:
             name = row["Name"]
             drops = int(row["Drops"])
             slip_days = int(row["Slip Days"])
-            categories[name] = Category(name, drops, slip_days)
+            has_late_multiplier = bool(row["Has Late Multiplier"])
+            categories[name] = Category(name, drops, slip_days, has_late_multiplier)
     return categories
 
 def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, Assignment]:
@@ -167,7 +168,7 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
     :param assignments: The assignments
     :type assignments: dict
     :param categories: The assignment categories, containing numbers of slip days
-    :type categoires: dict
+    :type categories: dict
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
         # Basically np.meshgrid with max sum <= slip_days
@@ -202,6 +203,51 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
                         possibility_with_slip[assignment.name].slip_days_applied = slip_days
                     student.grade_possibilities.append(possibility_with_slip)
 
+# TODO Put this in a config or something
+LATE_MULTIPLIER_DESC = "Late multiplier"
+LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
+
+def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
+    """Applies late multipliers to students
+
+    Late multipliers are applied by mutating every grade possibility and appending each grade's multipliers list.
+
+    :param students: The students to whom to apply late multipliers
+    :type students: dict
+    :param assignments: The assignments
+    :type assignments: dict
+    :param categories: The assignment categories, containing numbers of drops
+    :type categories: dict
+    """
+    zero = datetime.timedelta(0)
+    one = datetime.timedelta(days=1)
+    for student in students.values():
+        for grade_possibility in student.grade_possibilities:
+            for grade in grade_possibility.values():
+                lateness = grade.lateness
+                lateness -= datetime.timedelta(days=grade.slip_days_applied)
+                lateness = max(zero, lateness)
+                days_late = lateness.days
+                if lateness % one > zero:
+                    days_late += 1
+
+                assignment = assignments[grade.assignment_name]
+                category = categories[assignment.category]
+                late_multipliers: List[float]
+                if category.has_late_multiplier:
+                    late_multipliers = LATE_MULTIPLIERS
+                else:
+                    # Empty array means immediately 0.0 upon late
+                    late_multipliers = []
+
+                if days_late > 0:
+                    if days_late <= len(late_multipliers): # <= because zero-indexing
+                        multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing
+                    else:
+                        # Student submitted past latest possible time
+                        multiplier = 0.0
+                    grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+
 def main(args) -> None:
     roster_path = args.roster
     categories_path = args.categories
@@ -218,6 +264,7 @@ def main(args) -> None:
 
     apply_extensions(students, extensions)
     apply_slip_days(students, assignments, categories, {})
+    apply_late_multiplier(students, assignments, categories)
 
     print(list(students.values())[0].get_grade(assignments))
 
