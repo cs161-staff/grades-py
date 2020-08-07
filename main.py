@@ -179,6 +179,8 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
     :type assignments: dict
     :param categories: The assignment categories, containing numbers of slip days
     :type categories: dict
+    :param extra_slip_days: A dictionary mapping students' SIDs to a dictionary mapping category names to extra slip days they receive in that category
+    :type extra_slip_days: dict
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
         # Basically np.meshgrid with max sum <= slip_days
@@ -282,6 +284,18 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 for grade_to_remove in grades_to_remove:
                     del grade_possibility[grade_to_remove.assignment_name]
 
+def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
+    """Dumps students as a CSV to stdout
+
+    :param students: The students to dump
+    :type students: dict
+    :param assignments: The assignments
+    :type assignments: dict
+    """
+    print("SID,percentage")
+    for student in students.values():
+        print("{},{}".format(student.sid, student.get_grade(assignments)))
+
 def main(args) -> None:
     roster_path = args.roster
     categories_path = args.categories
@@ -301,7 +315,7 @@ def main(args) -> None:
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
 
-    print(list(students.values())[0].get_grade(assignments))
+    dump_students(students, assignments)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
