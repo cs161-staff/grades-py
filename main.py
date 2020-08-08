@@ -116,7 +116,10 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
                         score = float(scorestr)
                         # Lateness formatted as HH:MM:SS
                         lateness_components = row[assignment_lateness_header].split(":")
-                        lateness = datetime.timedelta(hours=int(lateness_components[0]), minutes=int(lateness_components[1]), seconds= int(lateness_components[2]))
+                        hours = int(lateness_components[0])
+                        minutes = int(lateness_components[1])
+                        seconds = int(lateness_components[2])
+                        lateness = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
                         # Take min with max score possible on Gradescope
                         max_score = float(row[assignment_max_points_header])
