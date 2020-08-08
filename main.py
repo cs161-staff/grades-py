@@ -139,8 +139,8 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             # Upon importing, there is only one possibility so far
             student.grade_possibilities = [grades]
 
-def apply_accommodations(acccomodations_path: str, students: Dict[int, Student]) -> None:
-    with open(acccomodations_path) as accommodations_file:
+def apply_accommodations(accommodations_path: str, students: Dict[int, Student]) -> None:
+    with open(accommodations_path) as accommodations_file:
         reader = csv.DictReader(accommodations_file)
         for row in reader:
             sid = int(row["SID"])
@@ -357,15 +357,15 @@ def main(args: argparse.Namespace) -> None:
     assignments_path = args.assignments
     grades_path = args.grades
     extensions_path = args.extensions
-    accomodations_path = args.accommodations
+    accommodations_path = args.accommodations
 
     students = import_roster(roster_path)
     categories = import_categories(categories_path, students)
     assignments = import_assignments(assignments_path, categories)
 
     import_grades(grades_path, students, assignments)
-    if accomodations_path:
-        apply_accommodations(accomodations_path, students)
+    if accommodations_path:
+        apply_accommodations(accommodations_path, students)
     if extensions_path:
         apply_extensions(extensions_path, students)
     apply_slip_days(students, assignments, categories)
