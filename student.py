@@ -39,6 +39,29 @@ class GradeReport:
         # Tuple is raw, category-weighted, weighted, comment
         self.assignments: Dict[str, Tuple[float, float, float, str]] = assignments if assignments else {}
 
+    @classmethod
+    def from_possibility(cls, grade_possibility: Dict[str, AssignmentGrade], assignments: Dict[str, Assignment], categories: Dict[str, Category]):
+        grade_report = GradeReport()
+        for category in categories.values():
+            assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
+            category_numerator = 0.0 # Weighted grades on assignments
+            category_denominator = 0.0 # Total assignment weights
+            for assignment in assignments_in_category:
+                grade = grade_possibility[assignment.name]
+                if grade.dropped:
+                    # Ignore dropped grades
+                    continue
+                category_numerator += grade.get_score() / assignment.score_possible * assignment.weight
+                category_denominator += assignment.weight
+            category_grade = category_numerator / category_denominator
+            category_weighted_grade = category_grade * category.weight
+            grade_report.categories[category.name] = (category_grade, category_weighted_grade)
+            grade_report.total_grade += category_weighted_grade
+        return grade_report
+
+    def __repr__(self) -> str:
+        return "GradeReport({}, {}, {})".format(self.total_grade, self.categories, self.assignments)
+
 class Student:
     def __init__(self, sid: int, name: str, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:
         self.sid = sid
@@ -52,22 +75,7 @@ class Student:
         best_grade_report: GradeReport = GradeReport()
         best_grade_report.total_grade = -float('inf')
         for grade_possibility in self.grade_possibilities:
-            grade_report = GradeReport()
-            for category in categories.values():
-                assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
-                category_numerator = 0.0 # Weighted grades on assignments
-                category_denominator = 0.0 # Total assignment weights
-                for assignment in assignments_in_category:
-                    grade = grade_possibility[assignment.name]
-                    if grade.dropped:
-                        # Ignore dropped grades
-                        continue
-                    category_numerator += grade.get_score() / assignment.score_possible * assignment.weight
-                    category_denominator += assignment.weight
-                category_grade = category_numerator / category_denominator
-                category_weighted_grade = category_grade * category.weight
-                grade_report.categories[category.name] = (category_grade, category_weighted_grade)
-                grade_report.total_grade += category_weighted_grade
+            grade_report = GradeReport.from_possibility(grade_possibility, assignments, categories)
             if grade_report.total_grade > best_grade_report.total_grade:
                 best_grade_report = grade_report
         return best_grade_report
