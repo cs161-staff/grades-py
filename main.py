@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Tuple
 
 from assignment import Assignment
 from category import Category
-from extension import Extension
 from student import AssignmentGrade, Multiplier, Student
 
 def import_roster(path: str) -> Dict[int, Student]:
@@ -158,15 +157,14 @@ def apply_accommodations(acccomodations_path: str, students: Dict[int, Student])
             student.drops[category] += drop_adjust
             student.slip_days[category] += slip_day_adjust
 
-def import_extensions(path: str) -> List[Extension]:
-    """Imports the extensions in the CSV file at the given path
+def apply_extensions(path: str, students: Dict[int, Student]) -> None:
+    """Imports and applies the extensions in the CSV file at the given path to the students
 
     :param path: The path of the extensions CSV
     :type path: str
-    :returns: A list of extensions
-    :rtype: list
+    :param students: The students to whom to apply the extensions
+    :type students: dict
     """
-    extensions = []
     with open(path) as extensions_file:
         reader = csv.DictReader(extensions_file)
         for row in reader:
@@ -174,32 +172,19 @@ def import_extensions(path: str) -> List[Extension]:
             assignment_name = row["Assignment"]
             days = int(row["Days"])
 
-            extension = Extension(sid, assignment_name, datetime.timedelta(days=days))
-            extensions.append(extension)
-    return extensions
+            if sid not in students:
+                # Don't raise an error because students may drop from roster
+                continue
 
-def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) -> None:
-    """Applies extensions to the students.
+            student = students[sid]
+            zero = datetime.timedelta(0)
 
-    Extensions are applied by subtracting the length of the extension from the student's lateness for the assignment. There is only one possibility: that extensions are applied.
-
-    :param students: The students to whom to apply the extensions
-    :type students: dict
-    :param extensions: The extension to be applied
-    :type extensions: list
-    """
-    for extension in extensions:
-        if extension.sid not in students:
-            # Skip students not in roster
-            continue
-        student = students[extension.sid]
-        for grade_possibility in student.grade_possibilities:
-            if extension.assignment_name not in grade_possibility:
-                # Skip assignments not in assignments list
-                # Assignment will not be in student.grades if not in assignment list
-                return
-            grade = grade_possibility[extension.assignment_name]
-            grade.lateness = max(grade.lateness - extension.length, datetime.timedelta(0))
+            for grade_possibility in student.grade_possibilities:
+                if assignment_name not in grade_possibility:
+                    # If not present in grade_possibility, it wasn't present in assignments CSV
+                    raise RuntimeError("Extension references unknown assignment {}".format(assignment_name))
+                grade = grade_possibility[assignment_name]
+                grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
 
 def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Applies slip days per category to students
@@ -371,11 +356,9 @@ def main(args) -> None:
     students = import_roster(roster_path)
     categories = import_categories(categories_path, students)
     assignments = import_assignments(assignments_path, categories)
+
     import_grades(grades_path, students, assignments)
-
-    extensions = import_extensions(extensions_path)
-
-    apply_extensions(students, extensions)
+    apply_extensions(extensions_path, students)
     apply_slip_days(students, assignments, categories)
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
