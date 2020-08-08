@@ -306,6 +306,7 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
     :param categories: The assignment categories, containing numbers of drops
     :type categories: dict
     """
+    # TODO Does not currently support unequally weighted assignments, since a low score on a lightly weighted assignment may not impact a grade as negatively
     for category in categories.values():
         assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
         assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
