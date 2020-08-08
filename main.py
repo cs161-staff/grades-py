@@ -205,21 +205,19 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
     for category in categories.values():
         assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
         for student in students.values():
-            slip_possibilities = get_slip_possibilities(len(assignments_in_category), student.slip_days[category.name])
             # Shallow copy student.grade_possibilities for concurrent modification
             for old_grade_possibility in list(student.grade_possibilities):
+                late_grades = list(filter(lambda grade: grade.lateness > datetime.timedelta(0), old_grade_possibility.values()))
+                slip_possibilities = get_slip_possibilities(len(late_grades), student.slip_days[category.name])
                 for slip_possibility in slip_possibilities:
                     if sum(slip_possibility) == 0:
                         # Skip 0 case, which is already present
                         continue
                     possibility_with_slip = copy.deepcopy(old_grade_possibility)
-                    for i in range(len(assignments_in_category)):
-                        assignment = assignments_in_category[i]
+                    for i in range(len(late_grades)):
+                        grade = late_grades[i]
                         slip_days = slip_possibility[i]
-                        if assignment.name not in possibility_with_slip:
-                            # Ignore non-present assignments in possibility
-                            continue
-                        possibility_with_slip[assignment.name].slip_days_applied = slip_days
+                        possibility_with_slip[grade.assignment_name].slip_days_applied = slip_days
                     student.grade_possibilities.append(possibility_with_slip)
 
 # TODO Put this in a config or something
