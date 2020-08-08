@@ -44,19 +44,33 @@ class GradeReport:
         grade_report = GradeReport()
         for category in categories.values():
             assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
-            category_numerator = 0.0 # Weighted grades on assignments
+            category_numerator = 0.0 # Category-weighted grades on assignments
             category_denominator = 0.0 # Total assignment weights
             for assignment in assignments_in_category:
                 grade = grade_possibility[assignment.name]
+                assignment_grade = grade.get_score() / assignment.score_possible
                 if grade.dropped:
-                    # Ignore dropped grades
-                    continue
-                category_numerator += grade.get_score() / assignment.score_possible * assignment.weight
-                category_denominator += assignment.weight
+                    assignment_category_weighted_grade = 0.0
+                    assignment_weighted_grade = 0.0
+                else:
+                    assignment_category_weighted_grade = assignment_grade * assignment.weight
+                    assignment_weighted_grade = assignment_category_weighted_grade * category.weight
+                    category_numerator += assignment_category_weighted_grade
+                    category_denominator += assignment.weight
+
+                assignment_comments: List[str] = []
+                for multipler in grade.multipliers_applied:
+                    assignment_comments.append("x{} ({})".format(multipler.multiplier, multipler.description))
+                assignment_comment = ", ".join(assignment_comments)
+
+                grade_report.assignments[assignment.name] = (assignment_grade, assignment_category_weighted_grade, assignment_weighted_grade, assignment_comment)
+
             category_grade = category_numerator / category_denominator
             category_weighted_grade = category_grade * category.weight
-            grade_report.categories[category.name] = (category_grade, category_weighted_grade)
             grade_report.total_grade += category_weighted_grade
+
+            grade_report.categories[category.name] = (category_grade, category_weighted_grade)
+
         return grade_report
 
     def __repr__(self) -> str:
