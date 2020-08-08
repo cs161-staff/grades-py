@@ -132,8 +132,29 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             # Upon importing, there is only one possibility so far
             student.grade_possibilities = [grades]
 
+def apply_accommodations(acccomodations_path: str, students: Dict[int, Student]) -> None:
+    with open(acccomodations_path) as accommodations_file:
+        reader = csv.DictReader(accommodations_file)
+        for row in reader:
+            sid = int(row["SID"])
+            category = row["Category"]
+            drop_adjust = int(row["Drop Adjust"])
+            slip_day_adjust = int(row["Slip Day Adjust"])
+
+            if sid not in students:
+                raise RuntimeError("Accommodations reference nonexistent student with SID {}".format(sid))
+
+            student = students[sid]
+
+            if category not in student.drops or category not in student.slip_days:
+                # If not present in student.drops or student.slip_days, it wasn't present in categories CSV
+                raise RuntimeError("Accommodations reference nonexistent category {}".format(category))
+
+            student.drops[category] += drop_adjust
+            student.slip_days[category] += slip_day_adjust
+
 def import_extensions(path: str) -> List[Extension]:
-    """Imports the CalCentral roster in the CSV file at the given path
+    """Imports the extensions in the CSV file at the given path
 
     :param path: The path of the extensions CSV
     :type path: str
@@ -348,6 +369,7 @@ if __name__ == "__main__":
     parser.add_argument("assignments", help="csv with assignments")
     parser.add_argument("grades", help="csv grades from Gradescope")
     parser.add_argument("extensions", help="csv grades with extensions")
+    parser.add_argument("accommodations", help="csv grades with accommodations for drops and slip days")
     #parser.add_argument("output_path", help="path where csv output should be saved")
     parser.add_argument("--config", "--c", help="yaml file of configs")
     parser.add_argument("--bins", "--b", help="yaml with letter grade bins")
