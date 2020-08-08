@@ -196,7 +196,7 @@ def apply_extensions(students: Dict[int, Student], extensions: List[Extension]) 
             grade = grade_possibility[extension.assignment_name]
             grade.lateness = max(grade.lateness - extension.length, datetime.timedelta(0))
 
-def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category], extra_slip_days: Dict[int, Dict[str, int]]) -> None:
+def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Applies slip days per category to students
 
     Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments.
@@ -207,8 +207,6 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
     :type assignments: dict
     :param categories: The assignment categories, containing numbers of slip days
     :type categories: dict
-    :param extra_slip_days: A dictionary mapping students' SIDs to a dictionary mapping category names to extra slip days they receive in that category
-    :type extra_slip_days: dict
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
         # Basically np.meshgrid with max sum <= slip_days
@@ -356,7 +354,7 @@ def main(args) -> None:
     extensions = import_extensions(extensions_path)
 
     apply_extensions(students, extensions)
-    apply_slip_days(students, assignments, categories, {})
+    apply_slip_days(students, assignments, categories)
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
 
