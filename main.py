@@ -2,7 +2,8 @@ import argparse
 import copy
 import csv
 import datetime
-from typing import Dict, List
+import sys
+from typing import Any, Dict, List
 
 from assignment import Assignment
 from category import Category
@@ -42,7 +43,7 @@ def import_categories(path: str) -> Dict[str, Category]:
             weight = float(row["Weight"])
             drops = int(row["Drops"])
             slip_days = int(row["Slip Days"])
-            has_late_multiplier = bool(row["Has Late Multiplier"])
+            has_late_multiplier = bool(int(row["Has Late Multiplier"]))
             categories[name] = Category(name, weight, drops, slip_days, has_late_multiplier)
     return categories
 
@@ -293,12 +294,27 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     :param assignments: The assignments
     :type assignments: dict
     """
-    print("SID,Total Score", end="")
+    header = ["SID", "Total Score"]
     for category in categories.values():
-        print(",{} - Score,{} - Weighted Score".format(category.name, category.name), end="")
-    print()
+        header.append("Category: {} - Score".format(category.name))
+        header.append("Category: {} - Weighted Score".format(category.name))
+    for assignment in assignments.values():
+        header.append("Assignment: {} - Score".format(assignment.name))
+        header.append("Assignment: {} - Category Weighted Score".format(assignment.name))
+        header.append("Assignment: {} - Weighted Score".format(assignment.name))
+        header.append("Assignment: {} - Comments".format(assignment.name))
+    rows = [header]
     for student in students.values():
-        print("{},{}".format(student.sid, student.get_grade_report(assignments, categories).total_grade))
+        grade_report = student.get_grade_report(assignments, categories)
+        row: List[Any] = [student.sid, grade_report.total_grade]
+        for category in categories.values():
+            category_report = grade_report.categories[category.name]
+            row.extend(category_report)
+        for assignment in assignments.values():
+            assignment_report = grade_report.assignments[assignment.name]
+            row.extend(assignment_report)
+        rows.append(row)
+    csv.writer(sys.stdout).writerows(rows)
 
 def main(args) -> None:
     roster_path = args.roster

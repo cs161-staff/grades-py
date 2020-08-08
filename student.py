@@ -61,6 +61,10 @@ class GradeReport:
                 assignment_comments: List[str] = []
                 for multipler in grade.multipliers_applied:
                     assignment_comments.append("x{} ({})".format(multipler.multiplier, multipler.description))
+                if grade.slip_days_applied > 0:
+                    assignment_comments.append("{} slip days applied".format(grade.slip_days_applied))
+                if grade.dropped:
+                    assignment_comments.append("Dropped")
                 assignment_comment = ", ".join(assignment_comments)
 
                 grade_report.assignments[assignment.name] = (assignment_grade, assignment_category_weighted_grade, assignment_weighted_grade, assignment_comment)
