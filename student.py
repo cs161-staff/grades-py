@@ -81,13 +81,15 @@ class GradeReport:
         return "GradeReport({}, {}, {})".format(self.total_grade, self.categories, self.assignments)
 
 class Student:
-    def __init__(self, sid: int, name: str, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:
+    def __init__(self, sid: int, name: str, drops: Dict[str, int] = None, slip_days: Dict[str, int] = None, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:
         self.sid = sid
         self.name = name
+        self.drops: Dict[str, int] = drops if drops else {}
+        self.slip_days: Dict[str, int] = slip_days if slip_days else {}
         self.grade_possibilities: List[Dict[str, AssignmentGrade]] = [] if not grade_possibilities else grade_possibilities
 
     def __repr__(self) -> str:
-        return "Student({}, '{}', {})".format(self.sid, self.name, self.grade_possibilities)
+        return "Student({}, '{}', {}, {}, {})".format(self.sid, self.name, self.drops, self.slip_days, self.grade_possibilities)
 
     def get_grade_report(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> GradeReport:
         best_grade_report: GradeReport = GradeReport()

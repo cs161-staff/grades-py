@@ -27,8 +27,8 @@ def import_roster(path: str) -> Dict[int, Student]:
             students[sid] = Student(sid, name)
     return students
 
-def import_categories(path: str) -> Dict[str, Category]:
-    """Imports assignment categories the CSV file at the given path
+def import_categories(path: str, students: Dict[int, Student]) -> Dict[str, Category]:
+    """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values
 
     :param path: The path of the category CSV
     :type path: str
@@ -41,10 +41,15 @@ def import_categories(path: str) -> Dict[str, Category]:
         for row in reader:
             name = row["Name"]
             weight = float(row["Weight"])
+            has_late_multiplier = bool(int(row["Has Late Multiplier"]))
+            categories[name] = Category(name, weight, has_late_multiplier)
+
             drops = int(row["Drops"])
             slip_days = int(row["Slip Days"])
-            has_late_multiplier = bool(int(row["Has Late Multiplier"]))
-            categories[name] = Category(name, weight, drops, slip_days, has_late_multiplier)
+            for student in students.values():
+                student.drops[name] = drops
+                student.slip_days[name] = slip_days
+
     return categories
 
 def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, Assignment]:
@@ -199,8 +204,8 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
 
     for category in categories.values():
         assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
-        slip_possibilities = get_slip_possibilities(len(assignments_in_category), category.slip_days)
         for student in students.values():
+            slip_possibilities = get_slip_possibilities(len(assignments_in_category), student.slip_days[category.name])
             # Shallow copy student.grade_possibilities for concurrent modification
             for old_grade_possibility in list(student.grade_possibilities):
                 for slip_possibility in slip_possibilities:
@@ -282,7 +287,8 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 grades = list(grade_possibility.values())
                 grades = list(filter(lambda grade: grade.assignment_name in assignment_names, grades))
                 grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
-                grades_to_drop = grades[:category.drops]
+                drops = student.drops[category.name]
+                grades_to_drop = grades[:drops]
                 for grade_to_drop in grades_to_drop:
                     grade_to_drop.dropped = True
 
@@ -324,7 +330,7 @@ def main(args) -> None:
     extensions_path = args.extensions
 
     students = import_roster(roster_path)
-    categories = import_categories(categories_path)
+    categories = import_categories(categories_path, students)
     assignments = import_assignments(assignments_path, categories)
     import_grades(grades_path, students, assignments)
 
