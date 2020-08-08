@@ -146,7 +146,8 @@ def apply_accommodations(acccomodations_path: str, students: Dict[int, Student])
             slip_day_adjust = int(row["Slip Day Adjust"])
 
             if sid not in students:
-                raise RuntimeError("Accommodations reference nonexistent student with SID {}".format(sid))
+                # Don't raise an error because students may drop from roster
+                continue
 
             student = students[sid]
 
@@ -352,12 +353,14 @@ def main(args) -> None:
     assignments_path = args.assignments
     grades_path = args.grades
     extensions_path = args.extensions
+    accomodations_path = args.accommodations
 
     students = import_roster(roster_path)
     categories = import_categories(categories_path, students)
     assignments = import_assignments(assignments_path, categories)
 
     import_grades(grades_path, students, assignments)
+    apply_accommodations(accomodations_path, students)
     apply_extensions(extensions_path, students)
     apply_slip_days(students, assignments, categories)
     apply_late_multiplier(students, assignments, categories)
