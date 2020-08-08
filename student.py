@@ -2,7 +2,7 @@ import datetime
 
 from assignment import Assignment
 from category import Category
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 class Multiplier:
     def __init__(self, multiplier: float, description: str) -> None:
@@ -31,6 +31,14 @@ class AssignmentGrade:
     def __repr__(self) -> str:
         return "AssignmentGrade('{}', {}, {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied, self.dropped)
 
+class GradeReport:
+    def __init__(self, total_grade: float = 0.0, categories: Dict[str, Tuple[float, float]] = None, assignments: Dict[str, Tuple[float, float, float, str]] = None) -> None:
+        self.total_grade = total_grade
+        # Tuple is raw, weighted, comment
+        self.categories: Dict[str, Tuple[float, float]] = categories if categories else {}
+        # Tuple is raw, category-weighted, weighted, comment
+        self.assignments: Dict[str, Tuple[float, float, float, str]] = assignments if assignments else {}
+
 class Student:
     def __init__(self, sid: int, name: str, grade_possibilities: List[Dict[str, AssignmentGrade]] = None) -> None:
         self.sid = sid
@@ -40,11 +48,11 @@ class Student:
     def __repr__(self) -> str:
         return "Student({}, '{}', {})".format(self.sid, self.name, self.grade_possibilities)
 
-    def get_grade(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> float:
-        best_grade = -float('inf')
-        best_possibility: Dict[str, AssignmentGrade]
+    def get_grade_report(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> GradeReport:
+        best_grade_report: GradeReport = GradeReport()
+        best_grade_report.total_grade = -float('inf')
         for grade_possibility in self.grade_possibilities:
-            total_grade = 0.0
+            grade_report = GradeReport()
             for category in categories.values():
                 assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
                 category_numerator = 0.0 # Weighted grades on assignments
@@ -57,9 +65,9 @@ class Student:
                     category_numerator += grade.get_score() / assignment.score_possible * assignment.weight
                     category_denominator += assignment.weight
                 category_grade = category_numerator / category_denominator
-                total_grade += category_grade * category.weight
-
-            if total_grade > best_grade:
-                best_grade = total_grade
-                best_possibility = grade_possibility
-        return best_grade
+                category_weighted_grade = category_grade * category.weight
+                grade_report.categories[category.name] = (category_grade, category_weighted_grade)
+                grade_report.total_grade += category_weighted_grade
+            if grade_report.total_grade > best_grade_report.total_grade:
+                best_grade_report = grade_report
+        return best_grade_report

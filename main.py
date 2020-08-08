@@ -293,9 +293,12 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     :param assignments: The assignments
     :type assignments: dict
     """
-    print("SID,percentage")
+    print("SID,Total Score", end="")
+    for category in categories.values():
+        print(",{} - Score,{} - Weighted Score".format(category.name, category.name), end="")
+    print()
     for student in students.values():
-        print("{},{}".format(student.sid, student.get_grade(assignments, categories)))
+        print("{},{}".format(student.sid, student.get_grade_report(assignments, categories).total_grade))
 
 def main(args) -> None:
     roster_path = args.roster
