@@ -3,7 +3,7 @@ import copy
 import csv
 import datetime
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from assignment import Assignment
 from category import Category
@@ -212,22 +212,27 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
             possibilities.extend(rest)
         return possibilities
 
+    zero = datetime.timedelta(0)
+
     for category in categories.values():
         assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
         for student in students.values():
             # Shallow copy student.grade_possibilities for concurrent modification
             for old_grade_possibility in list(student.grade_possibilities):
-                late_grades = list(filter(lambda grade: grade.lateness > datetime.timedelta(0), old_grade_possibility.values()))
-                late_in_category = list(filter(lambda grade: assignments[grade.assignment_name].category == category.name, old_grade_possibility.values()))
-                late_slip_groups = list(set(map(lambda grade: assignments[grade.assignment_name].slip_group, late_in_category)))
+                late_slip_groups: Set[int] = set()
+                for grade in old_grade_possibility.values():
+                    assignment = assignments[grade.assignment_name]
+                    if grade.lateness > zero and assignment.slip_group != -1:
+                        late_slip_groups.add(assignments[grade.assignment_name].slip_group)
                 slip_possibilities = get_slip_possibilities(len(late_slip_groups), student.slip_days[category.name])
+                late_slip_groups_list = list(late_slip_groups)
                 for slip_possibility in slip_possibilities:
                     if sum(slip_possibility) == 0:
                         # Skip 0 case, which is already present
                         continue
                     possibility_with_slip = copy.deepcopy(old_grade_possibility)
-                    for i in range(len(late_slip_groups)):
-                        slip_group = late_slip_groups[i]
+                    for i in range(len(late_slip_groups_list)):
+                        slip_group = late_slip_groups_list[i]
                         slip_days = slip_possibility[i]
                         for grade in possibility_with_slip.values():
                             if assignments[grade.assignment_name].slip_group == slip_group:
