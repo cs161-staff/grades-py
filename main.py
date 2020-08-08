@@ -351,7 +351,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
         rows.append(row)
     csv.writer(sys.stdout).writerows(rows)
 
-def main(args) -> None:
+def main(args: argparse.Namespace) -> None:
     roster_path = args.roster
     categories_path = args.categories
     assignments_path = args.assignments
@@ -364,8 +364,10 @@ def main(args) -> None:
     assignments = import_assignments(assignments_path, categories)
 
     import_grades(grades_path, students, assignments)
-    apply_accommodations(accomodations_path, students)
-    apply_extensions(extensions_path, students)
+    if accomodations_path:
+        apply_accommodations(accomodations_path, students)
+    if extensions_path:
+        apply_extensions(extensions_path, students)
     apply_slip_days(students, assignments, categories)
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
@@ -374,18 +376,13 @@ def main(args) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("roster", help="csv roster downloaded from CalCentral")
-    parser.add_argument("categories", help="csv grades with assignment categories")
-    parser.add_argument("assignments", help="csv with assignments")
-    parser.add_argument("grades", help="csv grades from Gradescope")
-    parser.add_argument("extensions", help="csv grades with extensions")
-    parser.add_argument("accommodations", help="csv grades with accommodations for drops and slip days")
-    #parser.add_argument("output_path", help="path where csv output should be saved")
-    parser.add_argument("--config", "--c", help="yaml file of configs")
-    parser.add_argument("--bins", "--b", help="yaml with letter grade bins")
-    parser.add_argument("--accommodations", "--a", help="accommdations, if any. Accommodations should be a csv file with at least 3 columns: SID, Assignment, Days. An additional \"Clobbered by\" column should be present for clobbers")
-    parser.add_argument("--round", "--r", type=int, default=5, help="Number of decimal places to round to")
-    parser.add_argument("--histogram", "--h", help="path where histogram, if desired, should be saved")
-    parser.add_argument("-v", "--verbose", action="count", help="verbosity")
+    parser.add_argument("roster", help="CSV roster downloaded from CalCentral")
+    parser.add_argument("grades", help="CSV grades downloaded from Gradescope")
+    parser.add_argument("categories", help="CSV with assignment categories")
+    parser.add_argument("assignments", help="CSV with assignments")
+    parser.add_argument("--extensions", "-e", help="CSV with extensions")
+    parser.add_argument("--accommodations", "-a", help="CSV with accommodations for drops and slip days")
+    #parser.add_argument("--config", "--c", help="yaml file of configs")
+    #parser.add_argument("-v", "--verbose", action="count", help="verbosity")
     args = parser.parse_args()
     main(args)
