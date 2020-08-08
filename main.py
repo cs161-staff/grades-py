@@ -190,7 +190,7 @@ def apply_extensions(path: str, students: Dict[int, Student]) -> None:
 def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Applies slip days per category to students
 
-    Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments.
+    Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments. The appropriate lateness is removed from the grade entry.
 
     :param students: The students to whom to apply slip days
     :type students: dict
@@ -235,8 +235,10 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
                         slip_group = late_slip_groups_list[i]
                         slip_days = slip_possibility[i]
                         for grade in possibility_with_slip.values():
+                            grade_with_slip = possibility_with_slip[grade.assignment_name]
                             if assignments[grade.assignment_name].slip_group == slip_group:
-                                possibility_with_slip[grade.assignment_name].slip_days_applied = slip_days
+                                grade_with_slip.slip_days_applied = slip_days
+                                grade_with_slip.lateness = max(grade_with_slip.lateness - datetime.timedelta(days=slip_days), zero)
                     student.grade_possibilities.append(possibility_with_slip)
 
 # TODO Put this in a config or something
@@ -273,12 +275,6 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
                 category = categories[assignment.category]
 
                 days_late = get_days_late(grade)
-                if assignment.slip_group != -1:
-                    # TODO This can be slightly optimized rather than going through the whole array again, but it doesn't really matter
-                    for grade2 in grade_possibility.values():
-                        assignment2 = assignments[grade2.assignment_name]
-                        if grade2 is not grade and assignment.slip_group == assignment2.slip_group:
-                            days_late = max(get_days_late(grade2), days_late)
 
                 late_multipliers: List[float]
                 if category.has_late_multiplier:
