@@ -70,9 +70,14 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
             category = row["Category"]
             score_possible = float(row["Possible"])
             weight = float(row["Weight"])
+            slip_group_str = row["Slip Group"]
+            if slip_group_str == None or slip_group_str == "":
+                slip_group = -1
+            else:
+                slip_group = int(slip_group_str)
             if category not in categories:
                 raise RuntimeError("Assignment {} references unknown category {}".format(name, category))
-            assignments[name] = Assignment(name, category, score_possible, weight)
+            assignments[name] = Assignment(name, category, score_possible, weight, slip_group)
     return assignments
 
 def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
@@ -227,16 +232,20 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
             # Shallow copy student.grade_possibilities for concurrent modification
             for old_grade_possibility in list(student.grade_possibilities):
                 late_grades = list(filter(lambda grade: grade.lateness > datetime.timedelta(0), old_grade_possibility.values()))
-                slip_possibilities = get_slip_possibilities(len(late_grades), student.slip_days[category.name])
+                late_in_category = list(filter(lambda grade: assignments[grade.assignment_name].category == category.name, old_grade_possibility.values()))
+                late_slip_groups = list(set(map(lambda grade: assignments[grade.assignment_name].slip_group, late_in_category)))
+                slip_possibilities = get_slip_possibilities(len(late_slip_groups), student.slip_days[category.name])
                 for slip_possibility in slip_possibilities:
                     if sum(slip_possibility) == 0:
                         # Skip 0 case, which is already present
                         continue
                     possibility_with_slip = copy.deepcopy(old_grade_possibility)
-                    for i in range(len(late_grades)):
-                        grade = late_grades[i]
+                    for i in range(len(late_slip_groups)):
+                        slip_group = late_slip_groups[i]
                         slip_days = slip_possibility[i]
-                        possibility_with_slip[grade.assignment_name].slip_days_applied = slip_days
+                        for grade in possibility_with_slip.values():
+                            if assignments[grade.assignment_name].slip_group == slip_group:
+                                possibility_with_slip[grade.assignment_name].slip_days_applied = slip_days
                     student.grade_possibilities.append(possibility_with_slip)
 
 # TODO Put this in a config or something
@@ -255,20 +264,31 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     :param categories: The assignment categories, containing numbers of drops
     :type categories: dict
     """
+    def get_days_late(grade: AssignmentGrade) -> int:
+        lateness = grade.lateness
+        lateness -= datetime.timedelta(days=grade.slip_days_applied)
+        lateness = max(zero, lateness)
+        days_late = lateness.days
+        if lateness % one > zero:
+            days_late += 1
+        return days_late
+
     zero = datetime.timedelta(0)
     one = datetime.timedelta(days=1)
     for student in students.values():
         for grade_possibility in student.grade_possibilities:
             for grade in grade_possibility.values():
-                lateness = grade.lateness
-                lateness -= datetime.timedelta(days=grade.slip_days_applied)
-                lateness = max(zero, lateness)
-                days_late = lateness.days
-                if lateness % one > zero:
-                    days_late += 1
-
                 assignment = assignments[grade.assignment_name]
                 category = categories[assignment.category]
+
+                days_late = get_days_late(grade)
+                if assignment.slip_group != -1:
+                    # TODO This can be slightly optimized rather than going through the whole array again, but it doesn't really matter
+                    for grade2 in grade_possibility.values():
+                        assignment2 = assignments[grade2.assignment_name]
+                        if grade2 is not grade and assignment.slip_group == assignment2.slip_group:
+                            days_late = max(get_days_late(grade2), days_late)
+
                 late_multipliers: List[float]
                 if category.has_late_multiplier:
                     late_multipliers = LATE_MULTIPLIERS
