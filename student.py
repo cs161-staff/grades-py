@@ -34,40 +34,41 @@ class AssignmentGrade:
 class GradeReport:
     def __init__(self, total_grade: float = 0.0, categories: Dict[str, Tuple[float, float]] = None, assignments: Dict[str, Tuple[float, float, float, str]] = None) -> None:
         self.total_grade = total_grade
-        # Tuple is raw, weighted, comment
+        # Tuple is adjusted (with multipliers), weighted (contribution to course points)
         self.categories: Dict[str, Tuple[float, float]] = categories if categories else {}
-        # Tuple is raw, category-weighted, weighted, comment
+        # Tuple is raw, adjusted (with multipliers), weighted (contribution to course points), comment
         self.assignments: Dict[str, Tuple[float, float, float, str]] = assignments if assignments else {}
 
     @classmethod
     def from_possibility(cls, grade_possibility: Dict[str, AssignmentGrade], assignments: Dict[str, Assignment], categories: Dict[str, Category]):
         grade_report = GradeReport()
         for category in categories.values():
-            assignments_in_category = filter(lambda assignment: assignment.category == category.name, assignments.values())
+            assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
             category_numerator = 0.0 # Category-weighted grades on assignments
             category_denominator = 0.0 # Total assignment weights
             for assignment in assignments_in_category:
                 grade = grade_possibility[assignment.name]
-                assignment_grade = grade.get_score() / assignment.score_possible
-                if grade.dropped:
-                    assignment_category_weighted_grade = 0.0
-                    assignment_weighted_grade = 0.0
-                else:
-                    assignment_category_weighted_grade = assignment_grade * assignment.weight
-                    assignment_weighted_grade = assignment_category_weighted_grade * category.weight
-                    category_numerator += assignment_category_weighted_grade
+                assignment_adjusted_grade = grade.get_score()
+                if not grade.dropped:
+                    category_numerator += assignment_adjusted_grade / assignment.score_possible * assignment.weight
                     category_denominator += assignment.weight
 
+            for assignment in assignments_in_category:
+                grade = grade_possibility[assignment.name]
+                assignment_raw_grade = grade.score / assignment.score_possible
+                assignment_adjusted_grade = grade.get_score() / assignment.score_possible
                 assignment_comments: List[str] = []
+                if grade.dropped:
+                    assignment_weighted_grade = 0.0
+                    assignment_comments.append("Dropped")
+                else:
+                    assignment_weighted_grade = assignment_adjusted_grade / category_denominator * assignment.weight * category.weight
                 for multipler in grade.multipliers_applied:
                     assignment_comments.append("x{} ({})".format(multipler.multiplier, multipler.description))
                 if grade.slip_days_applied > 0:
                     assignment_comments.append("{} slip days applied".format(grade.slip_days_applied))
-                if grade.dropped:
-                    assignment_comments.append("Dropped")
                 assignment_comment = ", ".join(assignment_comments)
-
-                grade_report.assignments[assignment.name] = (assignment_grade, assignment_category_weighted_grade, assignment_weighted_grade, assignment_comment)
+                grade_report.assignments[assignment.name] = (assignment_raw_grade, assignment_adjusted_grade, assignment_weighted_grade, assignment_comment)
 
             category_grade = category_numerator / category_denominator
             category_weighted_grade = category_grade * category.weight

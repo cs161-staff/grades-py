@@ -3,7 +3,7 @@ import copy
 import csv
 import datetime
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from assignment import Assignment
 from category import Category
@@ -337,24 +337,26 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     :param assignments: The assignments
     :type assignments: dict
     """
-    header = ["SID", "Total Score"]
+    header = ["SID", "Name", "Total Score"]
     for category in categories.values():
         header.append("Category: {} - Score".format(category.name))
         header.append("Category: {} - Weighted Score".format(category.name))
     for assignment in assignments.values():
-        header.append("{} - Score".format(assignment.name))
-        header.append("{} - Category Weighted Score".format(assignment.name))
+        header.append("{} - Raw Score".format(assignment.name))
+        header.append("{} - Adjusted Score".format(assignment.name))
         header.append("{} - Weighted Score".format(assignment.name))
         header.append("{} - Comments".format(assignment.name))
     rows = [header]
     for student in students.values():
         grade_report = student.get_grade_report(assignments, categories)
-        row: List[Any] = [student.sid, grade_report.total_grade]
+        row: List[Any] = [student.sid, student.name, grade_report.total_grade]
+        absent_category = ('no grades found', 'no grades found')
+        absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
-            category_report = grade_report.categories.get(category.name, [])
+            category_report: Tuple = grade_report.categories.get(category.name, absent_category)
             row.extend(category_report)
         for assignment in assignments.values():
-            assignment_report = grade_report.assignments.get(assignment.name, [])
+            assignment_report: Tuple = grade_report.assignments.get(assignment.name, absent_assignment)
             row.extend(assignment_report)
         rows.append(row)
     csv.writer(sys.stdout).writerows(rows)
