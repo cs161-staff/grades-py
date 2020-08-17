@@ -260,8 +260,7 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     :param categories: The assignment categories, containing numbers of drops
     :type categories: dict
     """
-    def get_days_late(grade: AssignmentGrade) -> int:
-        lateness = grade.lateness
+    def get_days_late(lateness: datetime.timedelta) -> int:
         lateness -= datetime.timedelta(days=grade.slip_days_applied)
         lateness = max(zero, lateness)
         days_late = lateness.days
@@ -273,20 +272,32 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     one = datetime.timedelta(days=1)
     for student in students.values():
         for grade_possibility in student.grade_possibilities:
+            # Build dict mapping slip groups to maximal number of days late
+            slip_group_lateness: Dict[int, datetime.timedelta] = {}
+            for grade in grade_possibility.values():
+                assignment = assignments[grade.assignment_name]
+                if grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or grade.lateness > slip_group_lateness[assignment.slip_group]):
+                    slip_group_lateness[assignment.slip_group] = grade.lateness
+
             for grade in grade_possibility.values():
                 assignment = assignments[grade.assignment_name]
                 category = categories[assignment.category]
 
-                days_late = get_days_late(grade)
-
-                late_multipliers: List[float]
-                if category.has_late_multiplier:
-                    late_multipliers = LATE_MULTIPLIERS
+                # Lateness is based on individual assignment if no slip group, else use early maximal value
+                days_late: int
+                if assignment.slip_group in slip_group_lateness:
+                    days_late = get_days_late(slip_group_lateness[assignment.slip_group])
                 else:
-                    # Empty array means immediately 0.0 upon late
-                    late_multipliers = []
+                    days_late = get_days_late(grade.lateness)
 
                 if days_late > 0:
+                    late_multipliers: List[float]
+                    if category.has_late_multiplier:
+                        late_multipliers = LATE_MULTIPLIERS
+                    else:
+                        # Empty array means immediately 0.0 upon late
+                        late_multipliers = []
+
                     if days_late <= len(late_multipliers): # <= because zero-indexing
                         multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing
                     else:
