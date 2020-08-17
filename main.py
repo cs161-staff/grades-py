@@ -261,7 +261,6 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     :type categories: dict
     """
     def get_days_late(lateness: datetime.timedelta) -> int:
-        lateness -= datetime.timedelta(days=grade.slip_days_applied)
         lateness = max(zero, lateness)
         days_late = lateness.days
         if lateness % one > zero:
