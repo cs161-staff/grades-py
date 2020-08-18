@@ -14,13 +14,14 @@ class Multiplier:
         return "Multiplier({}, '{}')".format(self.multiplier, self.description)
 
 class AssignmentGrade:
-    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, slip_days_applied: int = 0, multipliers_applied: List[Multiplier] = None, dropped: bool = False) -> None:
+    def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, slip_days_applied: int = 0, multipliers_applied: List[Multiplier] = None, dropped: bool = False, comments: List[str] = None) -> None:
         self.assignment_name = assignment_name
         self.score = score
         self.lateness = lateness
         self.slip_days_applied = slip_days_applied
         self.multipliers_applied: List[Multiplier] = multipliers_applied if multipliers_applied else []
         self.dropped = dropped
+        self.comments: List[str] = comments if comments else []
 
     def get_score(self) -> float:
         score = self.score
@@ -29,7 +30,7 @@ class AssignmentGrade:
         return score
 
     def __repr__(self) -> str:
-        return "AssignmentGrade('{}', {}, {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied, self.dropped)
+        return "AssignmentGrade('{}', {}, {}, {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.slip_days_applied, self.multipliers_applied, self.dropped, self.comments)
 
 class GradeReport:
     def __init__(self, total_grade: float = 0.0, categories: Dict[str, Tuple[float, float]] = None, assignments: Dict[str, Tuple[float, float, float, str]] = None) -> None:
@@ -57,7 +58,7 @@ class GradeReport:
                 grade = grade_possibility[assignment.name]
                 assignment_raw_grade = grade.score / assignment.score_possible
                 assignment_adjusted_grade = grade.get_score() / assignment.score_possible
-                assignment_comments: List[str] = []
+                assignment_comments: List[str] = list(grade.comments)
                 if grade.dropped:
                     assignment_weighted_grade = 0.0
                     assignment_comments.append("Dropped")

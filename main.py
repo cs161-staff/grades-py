@@ -330,6 +330,34 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 for grade_to_drop in grades_to_drop:
                     grade_to_drop.dropped = True
 
+# TODO Put this in another CSV or something
+COMMENTS = {
+    12345678: {
+        "Midterm": ["Example comment 1", "Example comment 2"],
+    },
+}
+
+def apply_comments(students: Dict[int, Student], comments: Dict[int, Dict[str, List[str]]]) -> None:
+    """Adds comments to students' grades
+
+    :param students: The students to whom to add comments
+    :type students: dict
+    :param comments: A dict mapping student IDs to a dict mapping assignment names to the list of comments
+    :type comments: dict
+    """
+    for sid in comments:
+        if sid not in students:
+            # Skip students not in roster
+            continue
+        student = students[sid]
+        for grade_possibility in student.grade_possibilities:
+            for assignment_name in comments[sid]:
+                if assignment_name not in grade_possibility:
+                    # If not present in grade_possibility, it wasn't present in assignments CSV
+                    raise RuntimeError("Comment references unknown assignment {}".format(assignment_name))
+                assignment_comments = comments[sid][assignment_name]
+                grade_possibility[assignment_name].comments.extend(assignment_comments)
+
 def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Dumps students as a CSV to stdout
 
@@ -382,6 +410,7 @@ def main(args: argparse.Namespace) -> None:
     apply_slip_days(students, assignments, categories)
     apply_late_multiplier(students, assignments, categories)
     apply_drops(students, assignments, categories)
+    apply_comments(students, COMMENTS)
 
     dump_students(students, assignments, categories)
 
