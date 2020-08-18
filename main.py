@@ -260,15 +260,17 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     :param categories: The assignment categories, containing numbers of drops
     :type categories: dict
     """
+    zero = datetime.timedelta(0)
+    one = datetime.timedelta(days=1)
+
     def get_days_late(lateness: datetime.timedelta) -> int:
         lateness = max(zero, lateness)
         days_late = lateness.days
-        if lateness % one > zero:
+        grace = datetime.timedelta(minutes=5)
+        if lateness % one > grace:
             days_late += 1
         return days_late
 
-    zero = datetime.timedelta(0)
-    one = datetime.timedelta(days=1)
     for student in students.values():
         for grade_possibility in student.grade_possibilities:
             # Build dict mapping slip groups to maximal number of days late
