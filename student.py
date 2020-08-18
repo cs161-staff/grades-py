@@ -100,4 +100,6 @@ class Student:
             grade_report = GradeReport.from_possibility(grade_possibility, assignments, categories)
             if grade_report.total_grade > best_grade_report.total_grade:
                 best_grade_report = grade_report
+        if best_grade_report.total_grade < 0.0:
+            best_grade_report.total_grade = 0.0
         return best_grade_report
