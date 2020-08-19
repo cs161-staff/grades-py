@@ -372,7 +372,10 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     :param rounding: The number of decimal places to round to, or None if no rounding
     :type rounding: int
     """
-    header = ["SID", "Name", "Total Score"]
+    student_scores: Dict[int, float] = {} # Used to efficiently sort for percentile
+
+    # Derive output rows
+    header = ["SID", "Name", "Total Score", "Percentile"]
     for category in categories.values():
         header.append("Category: {} - Score".format(category.name))
         header.append("Category: {} - Weighted Score".format(category.name))
@@ -384,7 +387,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     rows: List[List[Any]] = [header]
     for student in students.values():
         grade_report = student.get_grade_report(assignments, categories)
-        row: List[Any] = [student.sid, student.name, grade_report.total_grade]
+        row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile
         absent_category = ('no grades found', 'no grades found')
         absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
@@ -394,6 +397,21 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
             assignment_report: Tuple = grade_report.assignments.get(assignment.name, absent_assignment)
             row.extend(assignment_report)
         rows.append(row)
+        student_scores[student.sid] = grade_report.total_grade
+
+    # Compute percentiles
+    students_by_score = list(students.keys())
+    students_by_score.sort(key=student_scores.get, reverse=True)
+    num_students = len(students)
+    student_percentiles: Dict[int, float] = {}
+    for rank in range(len(students)):
+        sid = students_by_score[rank]
+        student_percentiles[sid] = 1.0 - rank / num_students
+    for row in rows:
+        if row is header:
+            continue
+        sid = row[0]
+        row[3] = student_percentiles[sid]
 
     # Round rows
     if rounding is not None:
