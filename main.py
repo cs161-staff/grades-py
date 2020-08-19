@@ -3,7 +3,7 @@ import copy
 import csv
 import datetime
 import sys
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from assignment import Assignment
 from category import Category
@@ -360,13 +360,17 @@ def apply_comments(students: Dict[int, Student], comments: Dict[int, Dict[str, L
                 assignment_comments = comments[sid][assignment_name]
                 grade_possibility[assignment_name].comments.extend(assignment_comments)
 
-def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
+def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
     """Dumps students as a CSV to stdout
 
     :param students: The students to dump
     :type students: dict
     :param assignments: The assignments
     :type assignments: dict
+    :param categories: The categories
+    :type categories: dict
+    :param rounding: The number of decimal places to round to, or None if no rounding
+    :type rounding: int
     """
     header = ["SID", "Name", "Total Score"]
     for category in categories.values():
@@ -377,7 +381,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
         header.append("{} - Adjusted Score".format(assignment.name))
         header.append("{} - Weighted Score".format(assignment.name))
         header.append("{} - Comments".format(assignment.name))
-    rows = [header]
+    rows: List[List[Any]] = [header]
     for student in students.values():
         grade_report = student.get_grade_report(assignments, categories)
         row: List[Any] = [student.sid, student.name, grade_report.total_grade]
@@ -390,6 +394,14 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
             assignment_report: Tuple = grade_report.assignments.get(assignment.name, absent_assignment)
             row.extend(assignment_report)
         rows.append(row)
+
+    # Round rows
+    if rounding is not None:
+        for row in rows:
+            for i in range(len(row)):
+                if isinstance(row[i], float):
+                    row[i] = round(float(row[i]), rounding)
+
     csv.writer(sys.stdout).writerows(rows)
 
 def main(args: argparse.Namespace) -> None:
@@ -399,6 +411,7 @@ def main(args: argparse.Namespace) -> None:
     grades_path = args.grades
     extensions_path = args.extensions
     accommodations_path = args.accommodations
+    rounding = int(args.rounding) if args.rounding else None
 
     students = import_roster(roster_path)
     categories = import_categories(categories_path, students)
@@ -414,7 +427,7 @@ def main(args: argparse.Namespace) -> None:
     apply_drops(students, assignments, categories)
     apply_comments(students, COMMENTS)
 
-    dump_students(students, assignments, categories)
+    dump_students(students, assignments, categories, rounding)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -424,6 +437,7 @@ if __name__ == "__main__":
     parser.add_argument("assignments", help="CSV with assignments")
     parser.add_argument("--extensions", "-e", help="CSV with extensions")
     parser.add_argument("--accommodations", "-a", help="CSV with accommodations for drops and slip days")
+    parser.add_argument("--rounding", "-r", help="Number of decimal places to round to")
     #parser.add_argument("--config", "--c", help="yaml file of configs")
     #parser.add_argument("-v", "--verbose", action="count", help="verbosity")
     args = parser.parse_args()
