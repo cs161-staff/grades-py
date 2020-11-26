@@ -10,11 +10,11 @@ from category import Category
 from student import AssignmentGrade, Multiplier, Student
 
 def import_roster(path: str) -> Dict[int, Student]:
-    """Imports the CalCentral roster in the CSV file at the given path
+    """Imports the CalCentral roster in the CSV file at the given path.
 
-    :param path: The path of the CalCentral roster
+    :param path: The path of the CalCentral roster.
     :type path: str
-    :returns: A dict mapping student IDs to students
+    :returns: A dict mapping student IDs to students.
     :rtype: dict
     """
     students: Dict[int, Student] = {}
@@ -27,11 +27,11 @@ def import_roster(path: str) -> Dict[int, Student]:
     return students
 
 def import_categories(path: str, students: Dict[int, Student]) -> Dict[str, Category]:
-    """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values
+    """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
 
-    :param path: The path of the category CSV
+    :param path: The path of the category CSV.
     :type path: str
-    :returns: A dict mapping category names to categories
+    :returns: A dict mapping category names to categories.
     :rtype: dict
     """
     categories: Dict[str, Category] = {}
@@ -52,13 +52,13 @@ def import_categories(path: str, students: Dict[int, Student]) -> Dict[str, Cate
     return categories
 
 def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, Assignment]:
-    """Imports assignments from the CSV file at the given path
+    """Imports assignments from the CSV file at the given path.
 
-    :param path: The path of the assignments CSV
+    :param path: The path of the assignments CSV.
     :type path: str
-    :param categories: The categories for assignments
+    :param categories: The categories for assignments.
     :type categories: dict
-    :returns: A dict mapping assignment names to assignments
+    :returns: A dict mapping assignment names to assignments.
     :rtype: dict
     """
     assignments: Dict[str, Assignment] = {}
@@ -80,15 +80,15 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
     return assignments
 
 def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
-    """Imports the Gradescope grade rports in the CSV file at the given path and imports them into the students
+    """Imports the Gradescope grade rports in the CSV file at the given path and imports them into the students.
 
-    :param path: The path of the Gradescope grade rport
+    :param path: The path of the Gradescope grade rport.
     :type path: str
-    :param students: The students into which grades will be entered
+    :param students: The students into which grades will be entered.
     :type students: dict
-    :param assignments: The assignments
+    :param assignments: The assignments.
     :type assignments: dict
-    :param students: The students from `import_roster`
+    :param students: The students from `import_roster`.
     :type students: list
     """
     with open(path) as grades_file:
@@ -99,7 +99,7 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             except ValueError as e:
                 continue
             if sid not in students:
-                # Skip students not in roster
+                # Skip students not in roster.
                 continue
 
             student = students[sid]
@@ -114,29 +114,29 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
                     scorestr = row[assignment_name]
                     if scorestr != "":
                         score = float(scorestr)
-                        # Lateness formatted as HH:MM:SS
+                        # Lateness formatted as HH:MM:SS.
                         lateness_components = row[assignment_lateness_header].split(":")
                         hours = int(lateness_components[0])
                         minutes = int(lateness_components[1])
                         seconds = int(lateness_components[2])
                         lateness = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
-                        # Take min with max score possible on Gradescope
+                        # Take min with max score possible on Gradescope.
                         max_score = float(row[assignment_max_points_header])
                         score = min(max_score, score)
                     else:
-                        # Empty string score string means no submission; assume 0.0
+                        # Empty string score string means no submission; assume 0.0.
                         score = 0.0
                         lateness = datetime.timedelta(0)
                 else:
-                    # No column for assignment; assume 0.0
+                    # No column for assignment; assume 0.0.
                     score = 0.0
                     lateness = datetime.timedelta(0)
 
                 grade = AssignmentGrade(assignment_name, score, lateness)
                 grades[assignment_name] = grade
 
-            # Upon importing, there is only one possibility so far
+            # Upon importing, there is only one possibility so far.
             student.grade_possibilities = [grades]
 
 def apply_accommodations(accommodations_path: str, students: Dict[int, Student]) -> None:
@@ -149,24 +149,24 @@ def apply_accommodations(accommodations_path: str, students: Dict[int, Student])
             slip_day_adjust = int(row["Slip Day Adjust"])
 
             if sid not in students:
-                # Don't raise an error because students may drop from roster
+                # Don't raise an error because students may drop from roster.
                 continue
 
             student = students[sid]
 
             if category not in student.drops or category not in student.slip_days:
-                # If not present in student.drops or student.slip_days, it wasn't present in categories CSV
+                # If not present in student.drops or student.slip_days, it wasn't present in categories CSV.
                 raise RuntimeError("Accommodations reference nonexistent category {}".format(category))
 
             student.drops[category] += drop_adjust
             student.slip_days[category] += slip_day_adjust
 
 def apply_extensions(path: str, students: Dict[int, Student]) -> None:
-    """Imports and applies the extensions in the CSV file at the given path to the students
+    """Imports and applies the extensions in the CSV file at the given path to the students.
 
-    :param path: The path of the extensions CSV
+    :param path: The path of the extensions CSV.
     :type path: str
-    :param students: The students to whom to apply the extensions
+    :param students: The students to whom to apply the extensions.
     :type students: dict
     """
     with open(path) as extensions_file:
@@ -177,7 +177,7 @@ def apply_extensions(path: str, students: Dict[int, Student]) -> None:
             days = int(row["Days"])
 
             if sid not in students:
-                # Don't raise an error because students may drop from roster
+                # Don't raise an error because students may drop from roster.
                 continue
 
             student = students[sid]
@@ -185,31 +185,31 @@ def apply_extensions(path: str, students: Dict[int, Student]) -> None:
 
             for grade_possibility in student.grade_possibilities:
                 if assignment_name not in grade_possibility:
-                    # If not present in grade_possibility, it wasn't present in assignments CSV
+                    # If not present in grade_possibility, it wasn't present in assignments CSV.
                     raise RuntimeError("Extension references unknown assignment {}".format(assignment_name))
                 grade = grade_possibility[assignment_name]
                 grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
 
 def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
-    """Applies slip days per category to students
+    """Applies slip days per category to students.
 
     Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments. The appropriate lateness is removed from the grade entry.
 
-    :param students: The students to whom to apply slip days
+    :param students: The students to whom to apply slip days.
     :type students: dict
-    :param assignments: The assignments
+    :param assignments: The assignments.
     :type assignments: dict
-    :param categories: The assignment categories, containing numbers of slip days
+    :param categories: The assignment categories, containing numbers of slip days.
     :type categories: dict
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
-        # Basically np.meshgrid with max sum <= slip_days
-        # TODO Optimize by removing unnecessary slip day possiblities (e.g. only using 2 when you can use 3)
+        # Basically np.meshgrid with max sum <= slip_days.
+        # TODO Optimize by removing unnecessary slip day possiblities (e.g. only using 2 when you can use 3).
         if num_assignments == 0:
             return [[]]
         possibilities: List[List[int]] = []
         for i in range(slip_days + 1):
-            # i is the number of slip days used for the first assignment
+            # i is the number of slip days used for the first assignment.
             rest = get_slip_possibilities(num_assignments - 1, slip_days - i)
             rest = list(map(lambda possibility: [i] + possibility, rest))
             possibilities.extend(rest)
@@ -220,7 +220,7 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
     for category in categories.values():
         assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
         for student in students.values():
-            # Shallow copy student.grade_possibilities for concurrent modification
+            # Shallow copy student.grade_possibilities for concurrent modification.
             for old_grade_possibility in list(student.grade_possibilities):
                 late_slip_groups: Set[int] = set()
                 for grade in old_grade_possibility.values():
@@ -231,7 +231,7 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
                 late_slip_groups_list = list(late_slip_groups)
                 for slip_possibility in slip_possibilities:
                     if sum(slip_possibility) == 0:
-                        # Skip 0 case, which is already present
+                        # Skip 0 case, which is already present.
                         continue
                     possibility_with_slip = copy.deepcopy(old_grade_possibility)
                     for i in range(len(late_slip_groups_list)):
@@ -244,7 +244,7 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
                                 grade_with_slip.lateness = max(grade_with_slip.lateness - datetime.timedelta(days=slip_days), zero)
                     student.grade_possibilities.append(possibility_with_slip)
 
-# TODO Put this in a config or something
+# TODO Put this in a config or something.
 LATE_MULTIPLIER_DESC = "Late multiplier"
 LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
 
@@ -273,7 +273,7 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
 
     for student in students.values():
         for grade_possibility in student.grade_possibilities:
-            # Build dict mapping slip groups to maximal number of days late
+            # Build dict mapping slip groups to maximal number of days late.
             slip_group_lateness: Dict[int, datetime.timedelta] = {}
             for grade in grade_possibility.values():
                 assignment = assignments[grade.assignment_name]
@@ -284,7 +284,7 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
                 assignment = assignments[grade.assignment_name]
                 category = categories[assignment.category]
 
-                # Lateness is based on individual assignment if no slip group, else use early maximal value
+                # Lateness is based on individual assignment if no slip group, else use early maximal value.
                 days_late: int
                 if assignment.slip_group in slip_group_lateness:
                     days_late = get_days_late(slip_group_lateness[assignment.slip_group])
@@ -296,29 +296,29 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
                     if category.has_late_multiplier:
                         late_multipliers = LATE_MULTIPLIERS
                     else:
-                        # Empty array means immediately 0.0 upon late
+                        # Empty array means immediately 0.0 upon late.
                         late_multipliers = []
 
-                    if days_late <= len(late_multipliers): # <= because zero-indexing
-                        multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing
+                    if days_late <= len(late_multipliers): # <= because zero-indexing.
+                        multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
                     else:
-                        # Student submitted past latest possible time
+                        # Student submitted past latest possible time.
                         multiplier = 0.0
                     grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
 
 def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
-    """Applies drops per categories to students
+    """Applies drops per categories to students.
 
-    Drops are applied by setting the dropped variable for the lowest assignments in each category.
+    Drops are applied by setting the dropped variable for the lowest assignments in each category..
 
-    :param students: The students to whom to apply late multipliers
+    :param students: The students to whom to apply late multipliers.
     :type students: dict
-    :param assignments: The assignments
+    :param assignments: The assignments.
     :type assignments: dict
-    :param categories: The assignment categories, containing numbers of drops
+    :param categories: The assignment categories, containing numbers of drops.
     :type categories: dict
     """
-    # TODO Does not currently support unequally weighted assignments, since a low score on a lightly weighted assignment may not impact a grade as negatively
+    # TODO Does not currently support unequally weighted assignments, since a low score on a lightly weighted assignment may not impact a grade as negatively.
     for category in categories.values():
         assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
         assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
@@ -332,7 +332,7 @@ def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment]
                 for grade_to_drop in grades_to_drop:
                     grade_to_drop.dropped = True
 
-# TODO Put this in another CSV or something
+# TODO Put this in another CSV or something.
 COMMENTS = {
     12345678: {
         "Midterm": ["Example comment 1", "Example comment 2"],
@@ -340,41 +340,41 @@ COMMENTS = {
 }
 
 def apply_comments(students: Dict[int, Student], comments: Dict[int, Dict[str, List[str]]]) -> None:
-    """Adds comments to students' grades
+    """Adds comments to students' grades.
 
-    :param students: The students to whom to add comments
+    :param students: The students to whom to add comments.
     :type students: dict
-    :param comments: A dict mapping student IDs to a dict mapping assignment names to the list of comments
+    :param comments: A dict mapping student IDs to a dict mapping assignment names to the list of comments.
     :type comments: dict
     """
     for sid in comments:
         if sid not in students:
-            # Skip students not in roster
+            # Skip students not in roster.
             continue
         student = students[sid]
         for grade_possibility in student.grade_possibilities:
             for assignment_name in comments[sid]:
                 if assignment_name not in grade_possibility:
-                    # If not present in grade_possibility, it wasn't present in assignments CSV
+                    # If not present in grade_possibility, it wasn't present in assignments CSV.
                     raise RuntimeError("Comment references unknown assignment {}".format(assignment_name))
                 assignment_comments = comments[sid][assignment_name]
                 grade_possibility[assignment_name].comments.extend(assignment_comments)
 
 def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
-    """Dumps students as a CSV to stdout
+    """Dumps students as a CSV to stdout.
 
-    :param students: The students to dump
+    :param students: The students to dump.
     :type students: dict
-    :param assignments: The assignments
+    :param assignments: The assignments.
     :type assignments: dict
-    :param categories: The categories
+    :param categories: The categories.
     :type categories: dict
-    :param rounding: The number of decimal places to round to, or None if no rounding
+    :param rounding: The number of decimal places to round to, or None if no rounding.
     :type rounding: int
     """
-    student_scores: Dict[int, float] = {} # Used to efficiently sort for percentile
+    student_scores: Dict[int, float] = {} # Used to efficiently sort for percentile.
 
-    # Derive output rows
+    # Derive output rows.
     header = ["SID", "Name", "Total Score", "Percentile"]
     for category in categories.values():
         header.append("Category: {} - Score".format(category.name))
@@ -387,7 +387,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     rows: List[List[Any]] = [header]
     for student in students.values():
         grade_report = student.get_grade_report(assignments, categories)
-        row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile
+        row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
         absent_category = ('no grades found', 'no grades found')
         absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
@@ -399,7 +399,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
         rows.append(row)
         student_scores[student.sid] = grade_report.total_grade
 
-    # Compute percentiles
+    # Compute percentiles.
     students_by_score = list(students.keys())
     students_by_score.sort(key=student_scores.get, reverse=True)
     num_students = len(students)
@@ -413,7 +413,7 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
         sid = row[0]
         row[3] = student_percentiles[sid]
 
-    # Round rows
+    # Round rows.
     if rounding is not None:
         for row in rows:
             for i in range(len(row)):
