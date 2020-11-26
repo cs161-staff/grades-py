@@ -19,7 +19,7 @@ You will need Python 3 to run this script.
 ## Usage
 
 ```
-python3 main.py <roster> <grades> <categories> <assignments> [--extensions EXTENSIONS] [--accommodations ACCOMMODATIONS] > output.csv
+python3 main.py <roster> <grades> <categories> <assignments> [--clobbers CLOBBERS] [--extensions EXTENSIONS] [--accommodations ACCOMMODATIONS] > output.csv
 ```
 
 ## Input Specifications
@@ -101,6 +101,26 @@ The `Weight` field is different in that the columns need not sum to 1.0, since
 we allow drops to any arbitrary assignment, which can affect category scores in
 different ways. Thus, for all assignments to be weighted equally, you may have a
 `1.0` in every assignment.
+
+### Clobber CSV
+
+The clobber CSV defines categories that should clobber each other, where a
+category's grade is replaced by a grade from another category, taking the
+highest of the two. The following columns are required:
+
+| Column | Description |
+| ------ | ----------- |
+| `Type` | The type of item clobbered, either `ASSIGNMENT` or `CATEGORY` |
+| `From` | The name of the assignment or category as the source of the clobber |
+| `To` | The name of the assignment or category being clobbered |
+| `Calculation` | The method of calculating clobbers, either `ZSCORE`, `WEIGHTED`, or `ABSOLUTE` |
+
+**Z-score** clobbers convert the student's score to a Z-score using the mean and
+standard deviation and then applies that Z-score to the clobber assignment using
+its mean and standard deviation. **Weighted** clobbers take the percentage
+earned on the assignment and applies that percentage to the clobbered
+assignment. **Absolute** clobbers apply the raw points to the clobbered
+assignment.
 
 ### Extensions CSV
 
