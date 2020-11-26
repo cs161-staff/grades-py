@@ -139,8 +139,17 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             # Upon importing, there is only one possibility so far.
             student.grade_possibilities = [grades]
 
-def apply_accommodations(accommodations_path: str, students: Dict[int, Student]) -> None:
-    with open(accommodations_path) as accommodations_file:
+def apply_accommodations(path: str, students: Dict[int, Student]) -> None:
+    """Imports and applies the accommodationsn in the CSV at the given path to the students.
+
+    Accommodations are applied by mutating the student objects to adjust how many drops and slip days they have.
+
+    :param path: The path of the accommodations CSV.
+    :type path: str
+    :param students: The students to whom to apply the extensions.
+    :type students: dict
+    """
+    with open(path) as accommodations_file:
         reader = csv.DictReader(accommodations_file)
         for row in reader:
             sid = int(row["SID"])
@@ -309,7 +318,7 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
 def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
     """Applies drops per categories to students.
 
-    Drops are applied by setting the dropped variable for the lowest assignments in each category..
+    Drops are applied by setting the dropped variable for the lowest assignments in each category.
 
     :param students: The students to whom to apply late multipliers.
     :type students: dict
