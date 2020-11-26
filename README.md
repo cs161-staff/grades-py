@@ -89,7 +89,7 @@ following columns are required:
 | `Category` | The name of the assignment's category |
 | `Possible` | The number of points possible on the assignment |
 | `Weight` | The weight of the assignment **within the category** |
-| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time |
+| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time) |
 
 Note that the `Possible` field is different from the `ASSIGNMENT - Max Points`
 field in the Gradescope export. The former defines the denominator used for
@@ -110,7 +110,7 @@ the late multiplier will not be applied. The following columns are required:
 | Column | Description |
 | ------ | ----------- |
 | `SID` | The student's SID |
-| `Assignemnt` | The name of the assignment whose deadline is being extended |
+| `Assignment` | The name of the assignment whose deadline is being extended |
 | `Days` | The number of days the deadline is extended by |
 
 ### Accommodations CSV
