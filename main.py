@@ -352,7 +352,7 @@ def make_late_multiplier(assignments: Dict[str, Assignment], categories: Dict[st
 def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies drops per categories.
 
-    Drops are applied by setting the dropped variable for the lowest assignments in each category.
+    Drops are applied by setting the dropped variable for all possible combinations of assignments to drop in each category.
 
     :param assignments: The assignments.
     :type assignments: dict
@@ -361,19 +361,33 @@ def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Categor
     :returns: An assignment drop policy function.
     :rtype: callable
     """
-    # TODO Does not currently support unequally weighted assignments, since a low score on a lightly weighted assignment may not impact a grade as negatively.
     def apply(student: Student) -> List[Student]:
-        new_student = copy.deepcopy(student)
+        # Assignments in drop_assignments[i] have drop_possibilities[i].
+        drop_assignments: List[List[str]] = []
+        drop_possibilities: List[Tuple[Tuple[bool, ...], ...]] = []
+
         for category in categories.values():
+            # Get all ways to assign drops to assignments in the category.
+            drops = student.drops[category.name]
             assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
-            assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
-            grades = list(filter(lambda grade: grade.assignment_name in assignment_names, new_student.grades.values()))
-            grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
-            drops = new_student.drops[category.name]
-            grades_to_drop = grades[:drops]
-            for grade_to_drop in grades_to_drop:
-                grade_to_drop.dropped = True
-        return [new_student]
+            category_possibility = tuple(i < drops for i in range(len(assignments_in_category)))
+
+            drop_assignments.append(list(assignment.name for assignment in assignments_in_category))
+            drop_possibilities.append(tuple(sorted(set(itertools.permutations(category_possibility)))))
+
+        new_students: List[Student] = []
+        for drop_possibility in itertools.product(*drop_possibilities):
+            new_student = copy.deepcopy(student)
+            for category_index in range(len(drop_possibility)):
+                category_possibility = drop_possibility[category_index]
+                for assignment_index in range(len(category_possibility)):
+                    assignment_name = drop_assignments[category_index][assignment_index]
+                    should_drop = category_possibility[assignment_index]
+                    if should_drop:
+                        new_student.grades[assignment_name].dropped = True
+                        new_student.grades[assignment_name].comments.append('Dropped')
+            new_students.append(new_student)
+        return new_students
     return apply
 
 # TODO Put this in another CSV or something.

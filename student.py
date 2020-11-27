@@ -71,9 +71,8 @@ class Student:
                 assignment_raw_grade = grade.score / assignment.score_possible
                 assignment_adjusted_grade = grade.get_score() / assignment.score_possible
                 assignment_comments: List[str] = list(grade.comments)
-                if grade.dropped:
+                if not grade.dropped:
                     assignment_weighted_grade = 0.0
-                    assignment_comments.append('Dropped')
                 else:
                     assignment_weighted_grade = assignment_adjusted_grade / category_denominator * assignment.weight * category.weight
                 for multiplier in grade.multipliers_applied:
@@ -81,7 +80,7 @@ class Student:
                 assignment_comment = ', '.join(assignment_comments)
                 grade_report.assignments[assignment.name] = (assignment_raw_grade, assignment_adjusted_grade, assignment_weighted_grade, assignment_comment)
 
-            category_grade = category_numerator / category_denominator
+            category_grade = category_numerator / category_denominator if category_denominator > 0.0 else 0.0
             category_weighted_grade = category_grade * category.weight
             grade_report.total_grade += category_weighted_grade
 
