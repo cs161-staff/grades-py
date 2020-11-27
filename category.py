@@ -6,4 +6,4 @@ class Category:
         self.has_late_multiplier = has_late_multiplier
 
     def __repr__(self) -> str:
-        return "Category('{}', {}, {})".format(self.name, self.weight, self.has_late_multiplier)
+        return f'Category({self.name}, {self.weight}, {self.has_late_multiplier})'

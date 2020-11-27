@@ -7,4 +7,4 @@ class Assignment:
         self.slip_group = slip_group
 
     def __repr__(self) -> str:
-        return "Assignment('{}', '{}', {}, {}, {})".format(self.name, self.category, self.score_possible, self.weight, self.slip_group)
+        return f'Assignment({self.name}, {self.category}, {self.score_possible}, {self.weight}, {self.slip_group})'

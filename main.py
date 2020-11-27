@@ -22,8 +22,8 @@ def import_roster(path: str) -> Dict[int, List[Student]]:
     with open(path) as roster_file:
         reader = csv.DictReader(roster_file)
         for row in reader:
-            sid = int(row["Student ID"])
-            name = row["Name"]
+            sid = int(row['Student ID'])
+            name = row['Name']
             students[sid] = [Student(sid, name)]
     return students
 
@@ -39,13 +39,13 @@ def import_categories(path: str, students: Dict[int, List[Student]]) -> Dict[str
     with open(path) as roster_file:
         reader = csv.DictReader(roster_file)
         for row in reader:
-            name = row["Name"]
-            weight = float(row["Weight"])
-            has_late_multiplier = bool(int(row["Has Late Multiplier"]))
+            name = row['Name']
+            weight = float(row['Weight'])
+            has_late_multiplier = bool(int(row['Has Late Multiplier']))
             categories[name] = Category(name, weight, has_late_multiplier)
 
-            drops = int(row["Drops"])
-            slip_days = int(row["Slip Days"])
+            drops = int(row['Drops'])
+            slip_days = int(row['Slip Days'])
             for sid in students:
                 for student in students[sid]:
                     student.drops[name] = drops
@@ -67,17 +67,17 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
     with open(path) as assignment_file:
         reader = csv.DictReader(assignment_file)
         for row in reader:
-            name = row["Name"]
-            category = row["Category"]
-            score_possible = float(row["Possible"])
-            weight = float(row["Weight"])
-            slip_group_str = row["Slip Group"]
-            if slip_group_str == None or slip_group_str == "":
+            name = row['Name']
+            category = row['Category']
+            score_possible = float(row['Possible'])
+            weight = float(row['Weight'])
+            slip_group_str = row['Slip Group']
+            if slip_group_str == None or slip_group_str == '':
                 slip_group = -1
             else:
                 slip_group = int(slip_group_str)
             if category not in categories:
-                raise RuntimeError("Assignment {} references unknown category {}".format(name, category))
+                raise RuntimeError(f'Assignment {name} references unknown category {category}')
             assignments[name] = Assignment(name, category, score_possible, weight, slip_group)
     return assignments
 
@@ -97,7 +97,7 @@ def import_grades(path: str, students: Dict[int, List[Student]], assignments: Di
         reader = csv.DictReader(grades_file)
         for row in reader:
             try:
-                sid = int(row["SID"])
+                sid = int(row['SID'])
             except ValueError as e:
                 continue
             if sid not in students:
@@ -106,16 +106,16 @@ def import_grades(path: str, students: Dict[int, List[Student]], assignments: Di
 
             grades: Dict[str, AssignmentGrade] = {}
             for assignment_name in assignments:
-                assignment_lateness_header = "{} - Lateness (H:M:S)".format(assignment_name)
-                assignment_max_points_header = "{} - Max Points".format(assignment_name)
+                assignment_lateness_header = f'{assignment_name} - Lateness (H:M:S)'
+                assignment_max_points_header = f'{assignment_name} - Max Points'
 
                 score: float
                 if assignment_name in row:
                     scorestr = row[assignment_name]
-                    if scorestr != "":
+                    if scorestr != '':
                         score = float(scorestr)
                         # Lateness formatted as HH:MM:SS.
-                        lateness_components = row[assignment_lateness_header].split(":")
+                        lateness_components = row[assignment_lateness_header].split(':')
                         hours = int(lateness_components[0])
                         minutes = int(lateness_components[1])
                         seconds = int(lateness_components[2])
@@ -172,7 +172,7 @@ def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
             slip_day_adjust = int(row['Slip Day Adjust'])
             if category not in student.drops or category not in student.slip_days:
                 # If not present in student.drops or student.slip_days, it wasn't present in categories CSV.
-                raise RuntimeError("Accommodations reference nonexistent category {}".format(category))
+                raise RuntimeError(f'Accommodations reference nonexistent category {category}')
             new_student.drops[category] += drop_adjust
             new_student.slip_days[category] += slip_day_adjust
         return [new_student]
@@ -203,7 +203,7 @@ def make_extensions(path: str) -> Callable[[Student], List[Student]]:
             days = int(row['Days'])
             if assignment_name not in student.grades:
                 # If not present in grade_possibility, it wasn't present in assignments CSV.
-                raise RuntimeError("Extension references unknown assignment {}".format(assignment_name))
+                raise RuntimeError(f'Extension references unknown assignment {assignment_name}')
             grade = new_student.grades[assignment_name]
             grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
         return [new_student]
@@ -274,7 +274,7 @@ def make_slip_days(assignments: Dict[str, Assignment], categories: Dict[str, Cat
                     for grade in student_with_slip.grades.values():
                         if assignments[grade.assignment_name].slip_group == slip_group:
                             grade.lateness = max(grade.lateness - datetime.timedelta(days=slip_days), zero)
-                            grade.comments.append('{} slip days applied'.format(slip_days))
+                            grade.comments.append(f'{slip_days} slip days applied')
             new_students.append(student_with_slip)
 
         return new_students
@@ -282,7 +282,7 @@ def make_slip_days(assignments: Dict[str, Assignment], categories: Dict[str, Cat
     return apply
 
 # TODO Put this in a config or something.
-LATE_MULTIPLIER_DESC = "Late multiplier"
+LATE_MULTIPLIER_DESC = 'Late multiplier'
 LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
 LATE_GRACE = datetime.timedelta(minutes=5)
 
@@ -379,7 +379,7 @@ def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Categor
 # TODO Put this in another CSV or something.
 COMMENTS = {
     12345678: {
-        "Midterm": ["Example comment 1", "Example comment 2"],
+        'Midterm': ['Example comment 1', 'Example comment 2'],
     },
 }
 
@@ -398,7 +398,7 @@ def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Studen
         for assignment_name in comments[new_student.sid]:
             if assignment_name not in student.grades:
                 # If not present in grade_possibility, it wasn't present in assignments CSV.
-                raise RuntimeError("Comment references unknown assignment {}".format(assignment_name))
+                raise RuntimeError(f'Comment references unknown assignment {assignment_name}')
             assignment_comments = comments[new_student.sid][assignment_name]
             new_student.grades[assignment_name].comments.extend(assignment_comments)
         return [new_student]
@@ -425,15 +425,15 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
                 grade_reports[sid] = grade_report
 
     # Derive output rows.
-    header = ["SID", "Name", "Total Score", "Percentile"]
+    header = ['SID', 'Name', 'Total Score', 'Percentile']
     for category in categories.values():
-        header.append("Category: {} - Score".format(category.name))
-        header.append("Category: {} - Weighted Score".format(category.name))
+        header.append(f'Category: {category.name} - Score')
+        header.append(f'Category: {category.name} - Weighted Score')
     for assignment in assignments.values():
-        header.append("{} - Raw Score".format(assignment.name))
-        header.append("{} - Adjusted Score".format(assignment.name))
-        header.append("{} - Weighted Score".format(assignment.name))
-        header.append("{} - Comments".format(assignment.name))
+        header.append(f'{assignment.name} - Raw Score')
+        header.append(f'{assignment.name} - Adjusted Score')
+        header.append(f'{assignment.name} - Weighted Score')
+        header.append(f'{assignment.name} - Comments')
     rows: List[List[Any]] = [header]
     for sid in students:
         grade_report = grade_reports[sid]
@@ -496,16 +496,16 @@ def main(args: argparse.Namespace) -> None:
 
     dump_students(students, assignments, categories, rounding)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("roster", help="CSV roster downloaded from CalCentral")
-    parser.add_argument("grades", help="CSV grades downloaded from Gradescope")
-    parser.add_argument("categories", help="CSV with assignment categories")
-    parser.add_argument("assignments", help="CSV with assignments")
-    parser.add_argument("--extensions", "-e", help="CSV with extensions")
-    parser.add_argument("--accommodations", "-a", help="CSV with accommodations for drops and slip days")
-    parser.add_argument("--rounding", "-r", help="Number of decimal places to round to")
-    #parser.add_argument("--config", "--c", help="yaml file of configs")
-    #parser.add_argument("-v", "--verbose", action="count", help="verbosity")
+    parser.add_argument('roster', help='CSV roster downloaded from CalCentral')
+    parser.add_argument('grades', help='CSV grades downloaded from Gradescope')
+    parser.add_argument('categories', help='CSV with assignment categories')
+    parser.add_argument('assignments', help='CSV with assignments')
+    parser.add_argument('--extensions', '-e', help='CSV with extensions')
+    parser.add_argument('--accommodations', '-a', help='CSV with accommodations for drops and slip days')
+    parser.add_argument('--rounding', '-r', help='Number of decimal places to round to')
+    #parser.add_argument('--config', '--c', help='yaml file of configs')
+    #parser.add_argument('-v', '--verbose', action='count', help='verbosity')
     args = parser.parse_args()
     main(args)

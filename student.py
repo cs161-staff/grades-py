@@ -6,12 +6,12 @@ from typing import Dict, List, Tuple
 
 class Multiplier:
     def __init__(self, multiplier: float, description: str) -> None:
-        assert multiplier >= 0.0, "Multiplier cannot be negative"
+        assert multiplier >= 0.0, 'Multiplier cannot be negative'
         self.multiplier = multiplier
         self.description = description
 
     def __repr__(self) -> str:
-        return "Multiplier({}, '{}')".format(self.multiplier, self.description)
+        return f'Multiplier({self.multiplier}, {self.description})'
 
 class AssignmentGrade:
     def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, multipliers_applied: List[Multiplier] = None, dropped: bool = False, comments: List[str] = None) -> None:
@@ -29,7 +29,7 @@ class AssignmentGrade:
         return score
 
     def __repr__(self) -> str:
-        return "AssignmentGrade('{}', {}, {}, {}, {}, {})".format(self.assignment_name, self.score, repr(self.lateness), self.multipliers_applied, self.dropped, self.comments)
+        return f'AssignmentGrade({self.assignment_name}, {self.score}, {self.lateness}, {self.multipliers_applied}, {self.dropped}, {self.comments})'
 
 class GradeReport:
     def __init__(self, total_grade: float = 0.0, categories: Dict[str, Tuple[float, float]] = None, assignments: Dict[str, Tuple[float, float, float, str]] = None) -> None:
@@ -40,7 +40,7 @@ class GradeReport:
         self.assignments: Dict[str, Tuple[float, float, float, str]] = assignments if assignments else {}
 
     def __repr__(self) -> str:
-        return "GradeReport({}, {}, {})".format(self.total_grade, self.categories, self.assignments)
+        return f'GradeReport({self.total_grade}, {self.categories}, {self.assignments})'
 
 class Student:
     def __init__(self, sid: int, name: str, drops: Dict[str, int] = {}, slip_days: Dict[str, int] = {}, grades: Dict[str, AssignmentGrade] = {}) -> None:
@@ -51,7 +51,7 @@ class Student:
         self.grades: Dict[str, AssignmentGrade] = grades
 
     def __repr__(self) -> str:
-        return "Student({}, '{}', {}, {}, {})".format(self.sid, self.name, self.drops, self.slip_days, self.grades)
+        return f'Student({self.sid}, {self.name}, {self.drops}, {self.slip_days}, {self.grades})'
 
     def get_grade_report(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> GradeReport:
         grade_report = GradeReport()
@@ -73,12 +73,12 @@ class Student:
                 assignment_comments: List[str] = list(grade.comments)
                 if grade.dropped:
                     assignment_weighted_grade = 0.0
-                    assignment_comments.append("Dropped")
+                    assignment_comments.append('Dropped')
                 else:
                     assignment_weighted_grade = assignment_adjusted_grade / category_denominator * assignment.weight * category.weight
-                for multipler in grade.multipliers_applied:
-                    assignment_comments.append("x{} ({})".format(multipler.multiplier, multipler.description))
-                assignment_comment = ", ".join(assignment_comments)
+                for multiplier in grade.multipliers_applied:
+                    assignment_comments.append(f'x{multiplier.multiplier} ({multiplier.description})')
+                assignment_comment = ', '.join(assignment_comments)
                 grade_report.assignments[assignment.name] = (assignment_raw_grade, assignment_adjusted_grade, assignment_weighted_grade, assignment_comment)
 
             category_grade = category_numerator / category_denominator
