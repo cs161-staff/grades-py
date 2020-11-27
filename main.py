@@ -2,31 +2,32 @@ import argparse
 import copy
 import csv
 import datetime
+import itertools
 import sys
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from assignment import Assignment
 from category import Category
-from student import AssignmentGrade, Multiplier, Student
+from student import AssignmentGrade, GradeReport, Multiplier, Student
 
-def import_roster(path: str) -> Dict[int, Student]:
+def import_roster(path: str) -> Dict[int, List[Student]]:
     """Imports the CalCentral roster in the CSV file at the given path.
 
     :param path: The path of the CalCentral roster.
     :type path: str
-    :returns: A dict mapping student IDs to students.
+    :returns: A dict mapping student IDs to a one-element list of students.
     :rtype: dict
     """
-    students: Dict[int, Student] = {}
+    students: Dict[int, List[Student]] = {}
     with open(path) as roster_file:
         reader = csv.DictReader(roster_file)
         for row in reader:
             sid = int(row["Student ID"])
             name = row["Name"]
-            students[sid] = Student(sid, name)
+            students[sid] = [Student(sid, name)]
     return students
 
-def import_categories(path: str, students: Dict[int, Student]) -> Dict[str, Category]:
+def import_categories(path: str, students: Dict[int, List[Student]]) -> Dict[str, Category]:
     """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
 
     :param path: The path of the category CSV.
@@ -45,9 +46,10 @@ def import_categories(path: str, students: Dict[int, Student]) -> Dict[str, Cate
 
             drops = int(row["Drops"])
             slip_days = int(row["Slip Days"])
-            for student in students.values():
-                student.drops[name] = drops
-                student.slip_days[name] = slip_days
+            for sid in students:
+                for student in students[sid]:
+                    student.drops[name] = drops
+                    student.slip_days[name] = slip_days
 
     return categories
 
@@ -79,7 +81,7 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
             assignments[name] = Assignment(name, category, score_possible, weight, slip_group)
     return assignments
 
-def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str, Assignment]) -> None:
+def import_grades(path: str, students: Dict[int, List[Student]], assignments: Dict[str, Assignment]) -> None:
     """Imports the Gradescope grade rports in the CSV file at the given path and imports them into the students.
 
     :param path: The path of the Gradescope grade rport.
@@ -101,8 +103,6 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
             if sid not in students:
                 # Skip students not in roster.
                 continue
-
-            student = students[sid]
 
             grades: Dict[str, AssignmentGrade] = {}
             for assignment_name in assignments:
@@ -136,80 +136,90 @@ def import_grades(path: str, students: Dict[int, Student], assignments: Dict[str
                 grade = AssignmentGrade(assignment_name, score, lateness)
                 grades[assignment_name] = grade
 
-            # Upon importing, there is only one possibility so far.
-            student.grade_possibilities = [grades]
+            # Mutate students to add fresh copies of their grades.
+            for student in students[sid]:
+                student.grades = copy.deepcopy(grades)
 
-def apply_accommodations(path: str, students: Dict[int, Student]) -> None:
-    """Imports and applies the accommodationsn in the CSV at the given path to the students.
+def apply_policy(policy: Callable[[Student], List[Student]], students: Dict[int, List[Student]]) -> None:
+    for sid in students.keys():
+        students[sid] = [new_student for student in students[sid] for new_student in policy(student)]
+        assert len(students[sid]) > 0, 'Policy function returned an empty list'
+
+def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that applies the accommodations in the CSV at the given path.
 
     Accommodations are applied by mutating the student objects to adjust how many drops and slip days they have.
 
     :param path: The path of the accommodations CSV.
     :type path: str
-    :param students: The students to whom to apply the extensions.
-    :type students: dict
+    :returns: An accommodations policy function.
+    :rtype: callable
     """
+    accommodations: Dict[int, List[Dict[str, str]]] = {}
     with open(path) as accommodations_file:
         reader = csv.DictReader(accommodations_file)
         for row in reader:
-            sid = int(row["SID"])
-            category = row["Category"]
-            drop_adjust = int(row["Drop Adjust"])
-            slip_day_adjust = int(row["Slip Day Adjust"])
+            sid = int(row['SID'])
+            accommodations.setdefault(sid, []).append(row)
 
-            if sid not in students:
-                # Don't raise an error because students may drop from roster.
-                continue
-
-            student = students[sid]
-
+    def apply(student: Student) -> List[Student]:
+        if student.sid not in accommodations:
+            return [student]
+        new_student = copy.deepcopy(student)
+        for row in accommodations[new_student.sid]:
+            category = row['Category']
+            drop_adjust = int(row['Drop Adjust'])
+            slip_day_adjust = int(row['Slip Day Adjust'])
             if category not in student.drops or category not in student.slip_days:
                 # If not present in student.drops or student.slip_days, it wasn't present in categories CSV.
                 raise RuntimeError("Accommodations reference nonexistent category {}".format(category))
+            new_student.drops[category] += drop_adjust
+            new_student.slip_days[category] += slip_day_adjust
+        return [new_student]
+    return apply
 
-            student.drops[category] += drop_adjust
-            student.slip_days[category] += slip_day_adjust
-
-def apply_extensions(path: str, students: Dict[int, Student]) -> None:
-    """Imports and applies the extensions in the CSV file at the given path to the students.
+def make_extensions(path: str) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that applies the extensions in the CSV file.
 
     :param path: The path of the extensions CSV.
     :type path: str
-    :param students: The students to whom to apply the extensions.
-    :type students: dict
+    :returns: An extensions policy function.
+    :rtype: callable
     """
+    extensions: Dict[int, List[Dict[str, str]]] = {}
     with open(path) as extensions_file:
         reader = csv.DictReader(extensions_file)
         for row in reader:
-            sid = int(row["SID"])
-            assignment_name = row["Assignment"]
-            days = int(row["Days"])
+            sid = int(row['SID'])
+            extensions.setdefault(sid, []).append(row)
+    zero = datetime.timedelta(0)
 
-            if sid not in students:
-                # Don't raise an error because students may drop from roster.
-                continue
+    def apply(student: Student) -> List[Student]:
+        if student.sid not in extensions:
+            return [student]
+        new_student = copy.deepcopy(student)
+        for row in extensions[new_student.sid]:
+            assignment_name = row['Assignment']
+            days = int(row['Days'])
+            if assignment_name not in student.grades:
+                # If not present in grade_possibility, it wasn't present in assignments CSV.
+                raise RuntimeError("Extension references unknown assignment {}".format(assignment_name))
+            grade = new_student.grades[assignment_name]
+            grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
+        return [new_student]
+    return apply
 
-            student = students[sid]
-            zero = datetime.timedelta(0)
+def make_slip_days(assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that Applies slip days per category.
 
-            for grade_possibility in student.grade_possibilities:
-                if assignment_name not in grade_possibility:
-                    # If not present in grade_possibility, it wasn't present in assignments CSV.
-                    raise RuntimeError("Extension references unknown assignment {}".format(assignment_name))
-                grade = grade_possibility[assignment_name]
-                grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
+    Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments. The appropriate lateness is removed from the grade entry, and a comment is added.
 
-def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
-    """Applies slip days per category to students.
-
-    Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments. The appropriate lateness is removed from the grade entry.
-
-    :param students: The students to whom to apply slip days.
-    :type students: dict
     :param assignments: The assignments.
     :type assignments: dict
     :param categories: The assignment categories, containing numbers of slip days.
     :type categories: dict
+    :returns: A slip days policy function.
+    :rtype: callable
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
         # Basically np.meshgrid with max sum <= slip_days.
@@ -226,48 +236,67 @@ def apply_slip_days(students: Dict[int, Student], assignments: Dict[str, Assignm
 
     zero = datetime.timedelta(0)
 
-    for category in categories.values():
-        assignments_in_category = list(filter(lambda a: a.category == category.name, assignments.values()))
-        for student in students.values():
-            # Shallow copy student.grade_possibilities for concurrent modification.
-            for old_grade_possibility in list(student.grade_possibilities):
-                late_slip_groups: Set[int] = set()
-                for grade in old_grade_possibility.values():
-                    assignment = assignments[grade.assignment_name]
-                    if grade.lateness > zero and assignment.slip_group != -1:
-                        late_slip_groups.add(assignments[grade.assignment_name].slip_group)
-                slip_possibilities = get_slip_possibilities(len(late_slip_groups), student.slip_days[category.name])
-                late_slip_groups_list = list(late_slip_groups)
-                for slip_possibility in slip_possibilities:
-                    if sum(slip_possibility) == 0:
-                        # Skip 0 case, which is already present.
-                        continue
-                    possibility_with_slip = copy.deepcopy(old_grade_possibility)
-                    for i in range(len(late_slip_groups_list)):
-                        slip_group = late_slip_groups_list[i]
-                        slip_days = slip_possibility[i]
-                        for grade in possibility_with_slip.values():
-                            grade_with_slip = possibility_with_slip[grade.assignment_name]
-                            if assignments[grade.assignment_name].slip_group == slip_group:
-                                grade_with_slip.slip_days_applied = slip_days
-                                grade_with_slip.lateness = max(grade_with_slip.lateness - datetime.timedelta(days=slip_days), zero)
-                    student.grade_possibilities.append(possibility_with_slip)
+    def apply(student: Student) -> List[Student]:
+        # slip_groups[i] have slip_possibilities[i].
+        slip_groups: List[Set[int]] = []
+        slip_possibilities: List[List[List[int]]] = []
+
+        for category_name in student.slip_days:
+            category = categories[category_name]
+            # Get all slip groups that the student has late in the category.
+            category_slip_groups: Set[int] = set()
+            for grade in student.grades.values():
+                assignment = assignments[grade.assignment_name]
+                if assignment.category == category.name and assignment.slip_group != -1 and grade.lateness > zero:
+                    category_slip_groups.add(assignments[grade.assignment_name].slip_group)
+
+            # Get all possible ways of applying slip days.
+            category_slip_possibilities = get_slip_possibilities(len(category_slip_groups), student.slip_days[category.name])
+
+            slip_groups.append(category_slip_groups)
+            slip_possibilities.append(category_slip_possibilities)
+
+        new_students: List[Student] = [student]
+
+        # All possibilities is the cross product of all possibilities in each category.
+        for slip_possibility in itertools.product(*slip_possibilities):
+            if sum(slip_days for category_slip_possibility in slip_possibility for slip_days in category_slip_possibility) == 0:
+                # Skip 0 slip day application case since it is already present in the list.
+                continue
+            student_with_slip = copy.deepcopy(student)
+            for category_index in range(len(slip_possibility)):
+                category_slip_groups = slip_groups[category_index]
+                category_slip_groups_list = list(category_slip_groups)
+                category_slip_possibility = slip_possibility[category_index]
+                for i in range(len(category_slip_groups_list)):
+                    slip_group = category_slip_groups_list[i]
+                    slip_days = category_slip_possibility[i]
+                    for grade in student_with_slip.grades.values():
+                        if assignments[grade.assignment_name].slip_group == slip_group:
+                            grade.lateness = max(grade.lateness - datetime.timedelta(days=slip_days), zero)
+                            grade.comments.append('{} slip days applied'.format(slip_days))
+            new_students.append(student_with_slip)
+
+        return new_students
+
+    return apply
 
 # TODO Put this in a config or something.
 LATE_MULTIPLIER_DESC = "Late multiplier"
 LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
+LATE_GRACE = datetime.timedelta(minutes=5)
 
-def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
-    """Applies late multipliers to students
+def make_late_multiplier(assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that applies late multipliers.
 
-    Late multipliers are applied by mutating every grade possibility and appending each grade's multipliers list.
+    Late multipliers are applied by appending to each grade's multipliers list.
 
-    :param students: The students to whom to apply late multipliers
-    :type students: dict
-    :param assignments: The assignments
+    :param assignments: The assignments.
     :type assignments: dict
-    :param categories: The assignment categories, containing numbers of drops
+    :param categories: The assignment categories, containing numbers of drops.
     :type categories: dict
+    :returns: A late multiplier policy function.
+    :rtype: callable
     """
     zero = datetime.timedelta(0)
     one = datetime.timedelta(days=1)
@@ -275,71 +304,77 @@ def apply_late_multiplier(students: Dict[int, Student], assignments: Dict[str, A
     def get_days_late(lateness: datetime.timedelta) -> int:
         lateness = max(zero, lateness)
         days_late = lateness.days
-        grace = datetime.timedelta(minutes=5)
-        if lateness % one > grace:
+        if lateness % one > LATE_GRACE:
             days_late += 1
         return days_late
 
-    for student in students.values():
-        for grade_possibility in student.grade_possibilities:
-            # Build dict mapping slip groups to maximal number of days late.
-            slip_group_lateness: Dict[int, datetime.timedelta] = {}
-            for grade in grade_possibility.values():
-                assignment = assignments[grade.assignment_name]
-                if grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or grade.lateness > slip_group_lateness[assignment.slip_group]):
-                    slip_group_lateness[assignment.slip_group] = grade.lateness
+    def apply(student: Student) -> List[Student]:
+        new_student = copy.deepcopy(student)
 
-            for grade in grade_possibility.values():
-                assignment = assignments[grade.assignment_name]
-                category = categories[assignment.category]
+        # Build dict mapping slip groups to maximal number of days late.
+        slip_group_lateness: Dict[int, datetime.timedelta] = {}
+        for grade in new_student.grades.values():
+            assignment = assignments[grade.assignment_name]
+            if grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or grade.lateness > slip_group_lateness[assignment.slip_group]):
+                slip_group_lateness[assignment.slip_group] = grade.lateness
 
-                # Lateness is based on individual assignment if no slip group, else use early maximal value.
-                days_late: int
-                if assignment.slip_group in slip_group_lateness:
-                    days_late = get_days_late(slip_group_lateness[assignment.slip_group])
+        # Apply lateness.
+        for grade in new_student.grades.values():
+            assignment = assignments[grade.assignment_name]
+            category = categories[assignment.category]
+
+            # Lateness is based on individual assignment if no slip group, else use early maximal value.
+            days_late: int
+            if assignment.slip_group in slip_group_lateness:
+                days_late = get_days_late(slip_group_lateness[assignment.slip_group])
+            else:
+                days_late = get_days_late(grade.lateness)
+
+            if days_late > 0:
+                late_multipliers: List[float]
+                if category.has_late_multiplier:
+                    late_multipliers = LATE_MULTIPLIERS
                 else:
-                    days_late = get_days_late(grade.lateness)
+                    # Empty array means immediately 0.0 upon late.
+                    late_multipliers = []
 
-                if days_late > 0:
-                    late_multipliers: List[float]
-                    if category.has_late_multiplier:
-                        late_multipliers = LATE_MULTIPLIERS
-                    else:
-                        # Empty array means immediately 0.0 upon late.
-                        late_multipliers = []
+                if days_late <= len(late_multipliers): # <= because zero-indexing.
+                    multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
+                else:
+                    # Student submitted past latest possible time.
+                    multiplier = 0.0
+                grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
 
-                    if days_late <= len(late_multipliers): # <= because zero-indexing.
-                        multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
-                    else:
-                        # Student submitted past latest possible time.
-                        multiplier = 0.0
-                    grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+        return [new_student]
 
-def apply_drops(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> None:
-    """Applies drops per categories to students.
+    return apply
+
+def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that applies drops per categories.
 
     Drops are applied by setting the dropped variable for the lowest assignments in each category.
 
-    :param students: The students to whom to apply late multipliers.
-    :type students: dict
     :param assignments: The assignments.
     :type assignments: dict
     :param categories: The assignment categories, containing numbers of drops.
     :type categories: dict
+    :returns: An assignment drop policy function.
+    :rtype: callable
     """
     # TODO Does not currently support unequally weighted assignments, since a low score on a lightly weighted assignment may not impact a grade as negatively.
-    for category in categories.values():
-        assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
-        assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
-        for student in students.values():
-            for grade_possibility in student.grade_possibilities:
-                grades = list(grade_possibility.values())
-                grades = list(filter(lambda grade: grade.assignment_name in assignment_names, grades))
-                grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
-                drops = student.drops[category.name]
-                grades_to_drop = grades[:drops]
-                for grade_to_drop in grades_to_drop:
-                    grade_to_drop.dropped = True
+    def apply(student: Student) -> List[Student]:
+        new_student = copy.deepcopy(student)
+        for category in categories.values():
+            assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
+            assignment_names = list(map(lambda assignment: assignment.name, assignments_in_category))
+            grades = list(filter(lambda grade: grade.assignment_name in assignment_names, new_student.grades.values()))
+            grades.sort(key=lambda grade: grade.get_score() / assignments[grade.assignment_name].score_possible)
+            drops = new_student.drops[category.name]
+            grades_to_drop = grades[:drops]
+            for grade_to_drop in grades_to_drop:
+                grade_to_drop.dropped = True
+        return [new_student]
+    return apply
 
 # TODO Put this in another CSV or something.
 COMMENTS = {
@@ -348,28 +383,28 @@ COMMENTS = {
     },
 }
 
-def apply_comments(students: Dict[int, Student], comments: Dict[int, Dict[str, List[str]]]) -> None:
-    """Adds comments to students' grades.
+def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that adds comments.
 
-    :param students: The students to whom to add comments.
-    :type students: dict
     :param comments: A dict mapping student IDs to a dict mapping assignment names to the list of comments.
     :type comments: dict
+    :returns: A comments policy function.
+    :rtype: callable
     """
-    for sid in comments:
-        if sid not in students:
-            # Skip students not in roster.
-            continue
-        student = students[sid]
-        for grade_possibility in student.grade_possibilities:
-            for assignment_name in comments[sid]:
-                if assignment_name not in grade_possibility:
-                    # If not present in grade_possibility, it wasn't present in assignments CSV.
-                    raise RuntimeError("Comment references unknown assignment {}".format(assignment_name))
-                assignment_comments = comments[sid][assignment_name]
-                grade_possibility[assignment_name].comments.extend(assignment_comments)
+    def apply(student: Student) -> List[Student]:
+        if student.sid not in comments:
+            return [student]
+        new_student = copy.deepcopy(student)
+        for assignment_name in comments[new_student.sid]:
+            if assignment_name not in student.grades:
+                # If not present in grade_possibility, it wasn't present in assignments CSV.
+                raise RuntimeError("Comment references unknown assignment {}".format(assignment_name))
+            assignment_comments = comments[new_student.sid][assignment_name]
+            new_student.grades[assignment_name].comments.extend(assignment_comments)
+        return [new_student]
+    return apply
 
-def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
+def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
     """Dumps students as a CSV to stdout.
 
     :param students: The students to dump.
@@ -381,7 +416,13 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
     :param rounding: The number of decimal places to round to, or None if no rounding.
     :type rounding: int
     """
-    student_scores: Dict[int, float] = {} # Used to efficiently sort for percentile.
+    grade_reports: Dict[int, GradeReport] = {}
+
+    for sid in students:
+        for student in students[sid]:
+            grade_report = student.get_grade_report(assignments, categories)
+            if sid not in grade_reports or grade_report.total_grade > grade_reports[sid].total_grade:
+                grade_reports[sid] = grade_report
 
     # Derive output rows.
     header = ["SID", "Name", "Total Score", "Percentile"]
@@ -394,8 +435,8 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
         header.append("{} - Weighted Score".format(assignment.name))
         header.append("{} - Comments".format(assignment.name))
     rows: List[List[Any]] = [header]
-    for student in students.values():
-        grade_report = student.get_grade_report(assignments, categories)
+    for sid in students:
+        grade_report = grade_reports[sid]
         row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
         absent_category = ('no grades found', 'no grades found')
         absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
@@ -406,11 +447,10 @@ def dump_students(students: Dict[int, Student], assignments: Dict[str, Assignmen
             assignment_report: Tuple = grade_report.assignments.get(assignment.name, absent_assignment)
             row.extend(assignment_report)
         rows.append(row)
-        student_scores[student.sid] = grade_report.total_grade
 
     # Compute percentiles.
     students_by_score = list(students.keys())
-    students_by_score.sort(key=student_scores.get, reverse=True)
+    students_by_score.sort(key=lambda sid: grade_reports[sid].total_grade, reverse=True)
     num_students = len(students)
     student_percentiles: Dict[int, float] = {}
     for rank in range(len(students)):
@@ -443,16 +483,16 @@ def main(args: argparse.Namespace) -> None:
     students = import_roster(roster_path)
     categories = import_categories(categories_path, students)
     assignments = import_assignments(assignments_path, categories)
-
     import_grades(grades_path, students, assignments)
+
     if accommodations_path:
-        apply_accommodations(accommodations_path, students)
+        apply_policy(make_accommodations(accommodations_path), students)
     if extensions_path:
-        apply_extensions(extensions_path, students)
-    apply_slip_days(students, assignments, categories)
-    apply_late_multiplier(students, assignments, categories)
-    apply_drops(students, assignments, categories)
-    apply_comments(students, COMMENTS)
+        apply_policy(make_extensions(extensions_path), students)
+    apply_policy(make_slip_days(assignments, categories), students)
+    apply_policy(make_late_multiplier(assignments, categories), students)
+    apply_policy(make_drops(assignments, categories), students)
+    apply_policy(make_comments(COMMENTS), students)
 
     dump_students(students, assignments, categories, rounding)
 
