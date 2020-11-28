@@ -20,9 +20,10 @@ class Clobber:
         SCALED = 'SCALED'
         ZSCORE = 'ZSCORE'
 
-    def __init__(self, clobber_type: 'Clobber.Type', source: str):
+    def __init__(self, clobber_type: 'Clobber.Type', source: str, scale: float):
         self.clobber_type = clobber_type
         self.source = source
+        self.scale = scale
 
     def get_new_score(self, target: str, student: 'Student', categories: Dict[str, Category], assignments: Dict[str, Assignment]) -> float:
         if self.clobber_type == Clobber.Type.ABSOLUTE:
@@ -33,10 +34,13 @@ class Clobber:
             score *= assignments[target].score_possible
         else:
             raise RuntimeError(f'Unknown clobber type {self.clobber_type}')
+
+        score *= self.scale
+
         return score
 
     def __repr__(self) -> str:
-        return f'Clobber({self.clobber_type}, {self.source})'
+        return f'Clobber({self.clobber_type}, {self.source}, {self.scale})'
 
 class AssignmentGrade:
     def __init__(self, assignment_name: str, score: float, lateness: datetime.timedelta, multipliers_applied: List[Multiplier] = None, dropped: bool = False, comments: List[str] = None, clobber: Optional[Clobber] = None) -> None:

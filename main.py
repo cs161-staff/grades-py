@@ -358,8 +358,9 @@ def make_clobbers(path: str, assignments: Dict[str, Assignment], categories: Dic
             scope = row['Scope']
             target = row['Target']
             source = row['Source']
+            scale = float(row['Scale'])
             clobber_type = Clobber.Type(row['Type'])
-            clobber = Clobber(clobber_type, source)
+            clobber = Clobber(clobber_type, source, scale)
             if scope == 'CATEGORY':
                 if source not in categories:
                     raise RuntimeError(f'Clobber references unknown category {source}')
@@ -404,7 +405,7 @@ def make_clobbers(path: str, assignments: Dict[str, Assignment], categories: Dic
                 assignment_clobber = assignment_possibility[assignment_index]
                 if assignment_clobber is not None:
                     new_student.grades[assignment_name].clobber = copy.deepcopy(assignment_clobber)
-                    new_student.grades[assignment_name].comments.append(f'Clobbered by {clobber.source}')
+                    new_student.grades[assignment_name].comments.append(f'Clobbered by {clobber.source} using {clobber.clobber_type.value} at {clobber.scale} scale')
             new_students.append(new_student)
         return new_students
     return apply
