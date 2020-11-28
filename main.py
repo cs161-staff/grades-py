@@ -455,11 +455,21 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
         absent_category = ('no grades found', 'no grades found')
         absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
-            category_report: Tuple = grade_report.categories.get(category.name, absent_category)
-            row.extend(category_report)
+            if category.name in grade_report.categories:
+                category_report = grade_report.categories[category.name]
+                row.append(category_report.adjusted)
+                row.append(category_report.weighted)
+            else:
+                row.extend(absent_category)
         for assignment in assignments.values():
-            assignment_report: Tuple = grade_report.assignments.get(assignment.name, absent_assignment)
-            row.extend(assignment_report)
+            if assignment.name in grade_report.assignments:
+                assignment_report = grade_report.assignments[assignment.name]
+                row.append(assignment_report.raw)
+                row.append(assignment_report.adjusted)
+                row.append(assignment_report.weighted)
+                row.append(assignment_report.comment)
+            else:
+                row.extend(absent_assignment)
         rows.append(row)
 
     # Compute percentiles.
