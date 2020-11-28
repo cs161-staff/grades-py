@@ -491,7 +491,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
         for row in rows:
             for i in range(len(row)):
                 if isinstance(row[i], float):
-                    row[i] = round(float(row[i]), rounding)
+                    row[i] = round(row[i], rounding)
 
     csv.writer(sys.stdout).writerows(rows)
 
