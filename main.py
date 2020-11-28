@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from assignment import Assignment
 from category import Category
-from student import AssignmentGrade, GradeReport, Multiplier, Student
+from student import AssignmentGrade, Clobber, GradeReport, Multiplier, Student
 
 def import_roster(path: str) -> Dict[int, List[Student]]:
     """Imports the CalCentral roster in the CSV file at the given path.
@@ -349,6 +349,66 @@ def make_late_multiplier(assignments: Dict[str, Assignment], categories: Dict[st
 
     return apply
 
+def make_clobbers(path: str, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
+    category_clobbers: Dict[str, List[Clobber]] = {}
+    assignment_clobbers: Dict[str, List[Clobber]] = {}
+    with open(path) as clobbers_file:
+        reader = csv.DictReader(clobbers_file)
+        for row in reader:
+            scope = row['Scope']
+            target = row['Target']
+            source = row['Source']
+            clobber_type = Clobber.Type(row['Type'])
+            clobber = Clobber(clobber_type, source)
+            if scope == 'CATEGORY':
+                if source not in categories:
+                    raise RuntimeError(f'Clobber references unknown category {source}')
+                if target not in categories:
+                    raise RuntimeError(f'Clobber references unknown category {target}')
+                category_clobbers.setdefault(target, []).append(clobber)
+            elif scope == 'ASSIGNMENT':
+                if source not in assignments:
+                    raise RuntimeError(f'Clobber references unknown assignment {source}')
+                if target not in assignments:
+                    raise RuntimeError(f'Clobber references unknown assignment {target}')
+                assignment_clobbers.setdefault(target, []).append(clobber)
+            else:
+                raise RuntimeError(f'Unknown clobber scope {scope}')
+
+    # category_names[i] has possible clobbers category_possibilities[i].
+    category_names = tuple(categories.keys())
+    category_possibilities = tuple((None, *category_clobbers.get(name, [])) for name in category_names)
+    # assignment_names[i] has possibe clobbers assignment_possibilities[i].
+    assignment_names = tuple(assignments.keys())
+    assignment_possibilities = tuple((None, *assignment_clobbers.get(name, [])) for name in assignment_names)
+
+    # Compute all possibilities of applying clobbers.
+    possibilities = tuple(itertools.product(itertools.product(*category_possibilities), itertools.product(*assignment_possibilities)))
+
+    def apply(student: Student) -> List[Student]:
+        new_students = [student]
+        for possibility in possibilities:
+            if all(clobber is None for subpossibilities in possibility for clobber in subpossibilities):
+                # Skip if all clobbers are None, since this is already part of the original student.
+                continue
+            category_possibility = possibility[0]
+            assignment_possibility = possibility[1]
+            new_student = copy.deepcopy(student)
+            for category_index in range(len(category_names)):
+                category_name = category_names[category_index]
+                category_clobber = category_possibility[category_index]
+                if category_clobber is not None:
+                    raise NotImplementedError('Category clobbers not yet implemented')
+            for assignment_index in range(len(assignment_names)):
+                assignment_name = assignment_names[assignment_index]
+                assignment_clobber = assignment_possibility[assignment_index]
+                if assignment_clobber is not None:
+                    new_student.grades[assignment_name].clobber = copy.deepcopy(assignment_clobber)
+                    new_student.grades[assignment_name].comments.append(f'Clobbered by {clobber.source}')
+            new_students.append(new_student)
+        return new_students
+    return apply
+
 def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies drops per categories.
 
@@ -500,6 +560,7 @@ def main(args: argparse.Namespace) -> None:
     categories_path = args.categories
     assignments_path = args.assignments
     grades_path = args.grades
+    clobbers_path = args.clobbers
     extensions_path = args.extensions
     accommodations_path = args.accommodations
     rounding = int(args.rounding) if args.rounding else None
@@ -516,6 +577,8 @@ def main(args: argparse.Namespace) -> None:
     apply_policy(make_slip_days(assignments, categories), students)
     apply_policy(make_late_multiplier(assignments, categories), students)
     apply_policy(make_drops(assignments, categories), students)
+    if clobbers_path:
+        apply_policy(make_clobbers(clobbers_path, assignments, categories), students)
     apply_policy(make_comments(COMMENTS), students)
 
     dump_students(students, assignments, categories, rounding)
@@ -526,6 +589,7 @@ if __name__ == '__main__':
     parser.add_argument('grades', help='CSV grades downloaded from Gradescope')
     parser.add_argument('categories', help='CSV with assignment categories')
     parser.add_argument('assignments', help='CSV with assignments')
+    parser.add_argument('--clobbers', '-c', help='CSV with clobbers')
     parser.add_argument('--extensions', '-e', help='CSV with extensions')
     parser.add_argument('--accommodations', '-a', help='CSV with accommodations for drops and slip days')
     parser.add_argument('--rounding', '-r', help='Number of decimal places to round to')
