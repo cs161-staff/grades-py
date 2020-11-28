@@ -110,17 +110,16 @@ highest of the two. The following columns are required:
 
 | Column | Description |
 | ------ | ----------- |
-| `Type` | The type of item clobbered, either `ASSIGNMENT` or `CATEGORY` |
+| `Scope` | The type of item clobbered, either `ASSIGNMENT` or `CATEGORY` |
 | `From` | The name of the assignment or category as the source of the clobber |
 | `To` | The name of the assignment or category being clobbered |
-| `Calculation` | The method of calculating clobbers, either `ZSCORE`, `WEIGHTED`, or `ABSOLUTE` |
+| `Type` | The method of calculating clobbers, either `ZSCORE`, `SCALED`, or `ABSOLUTE` |
 
 **Z-score** clobbers convert the student's score to a Z-score using the mean and
 standard deviation and then applies that Z-score to the clobber assignment using
-its mean and standard deviation. **Weighted** clobbers take the percentage
-earned on the assignment and applies that percentage to the clobbered
-assignment. **Absolute** clobbers apply the raw points to the clobbered
-assignment.
+its mean and standard deviation. **Scaled** clobbers take the percentage earned
+on the assignment and applies that percentage to the clobbered assignment.
+**Absolute** clobbers apply the raw points to the clobbered assignment.
 
 ### Extensions CSV
 
