@@ -159,15 +159,16 @@ receive, but this likely is not a useful feature.
 
 This script is constructed to enumerate all possibilities of applying grading
 policies (such as all ways to assign slip days and/or drops) and choosing the
-option that most benefits the student. Each `Student` has a
-`grade_possibilities` list that represents one possibility. Each application of
-course policies and individual accommodations (the `apply_*` functions) will
-mutate each student's `grade_possibilities` list, increasing its length if there
-are multiple possibilities for this course policy (e.g. slip days). For simpler
-policies, such as extensions, the possibility list will be mutated in place
-without adding new possibilities for the sake of efficiency and reasonable
-optimization (e.g. there is no circumstance in which not applying a homework
-drop would be more beneficial).
+option that most benefits the student. Each `Student` represents one possibility
+of applying policy. Each application of course policies and individual
+accommodations will take one such `Student` and return a list of `Students`, so
+that each policy can branch out to multiple possibilities, such as applying slip
+days in different combinations. For simpler policies, such as extensions, the
+returned list can be one element, so the possibility list will essentially be
+mapped one-to-one to another list mutated in place without adding new
+possibilities for the sake of efficiency and reasonable optimization (e.g.
+there is no circumstance in which not applying a homework drop would be more
+beneficial).
 
 After all policies and accommodations are applied, the grade calculation is run
 for all policies for each student, and the final grade assigned to them is the
