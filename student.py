@@ -25,13 +25,13 @@ class Clobber:
         self.source = source
         self.scale = scale
 
-    def get_new_score(self, target: str, student: 'Student', categories: Dict[str, Category], assignments: Dict[str, Assignment]) -> float:
+    def get_new_score(self, target: str, student: 'Student') -> float:
         if self.clobber_type == Clobber.Type.ABSOLUTE:
             score = student.grades[self.source].get_score()
         elif self.clobber_type == Clobber.Type.SCALED:
             score = student.grades[self.source].get_score()
-            score /= assignments[self.source].score_possible
-            score *= assignments[target].score_possible
+            score /= student.assignments[self.source].score_possible
+            score *= student.assignments[target].score_possible
         else:
             raise RuntimeError(f'Unknown clobber type {self.clobber_type}')
 
@@ -91,20 +91,20 @@ class GradeReport:
         return f'GradeReport({self.total_grade}, {self.categories}, {self.assignments})'
 
 class Student:
-    def __init__(self, sid: int, name: str, drops: Dict[str, int] = None, slip_days: Dict[str, int] = None, grades: Dict[str, AssignmentGrade] = None) -> None:
+    def __init__(self, sid: int, name: str, categories: Dict[str, Category], assignments: Dict[str, Assignment], grades: Dict[str, AssignmentGrade] = None) -> None:
         self.sid = sid
         self.name = name
-        self.drops = drops if drops is not None else {}
-        self.slip_days = slip_days if slip_days is not None else {}
+        self.categories = categories
+        self.assignments = assignments
         self.grades = grades if grades is not None else {}
 
     def __repr__(self) -> str:
-        return f'Student({self.sid}, {self.name}, {self.drops}, {self.slip_days}, {self.grades})'
+        return f'Student({self.sid}, {self.name}, {self.categories}, {self.assignments}, {self.grades})'
 
-    def get_grade_report(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> GradeReport:
+    def get_grade_report(self) -> GradeReport:
         grade_report = GradeReport()
-        for category in categories.values():
-            assignments_in_category = list(assignment for assignment in assignments.values() if assignment.category == category.name)
+        for category in self.categories.values():
+            assignments_in_category = list(assignment for assignment in self.assignments.values() if assignment.category == category.name)
             category_numerator = 0.0 # Category-weighted grades on assignments
             category_denominator = 0.0 # Total assignment weights
 
@@ -133,7 +133,7 @@ class Student:
 
                 # Clobbers.
                 if grade.clobber is not None:
-                    new_adjusted_score = grade.clobber.get_new_score(grade.assignment_name, self, categories, assignments)
+                    new_adjusted_score = grade.clobber.get_new_score(grade.assignment_name, self)
                     assignment_entry.adjusted = new_adjusted_score / assignment.score_possible
 
                 # Category numerator and weighted grades.
