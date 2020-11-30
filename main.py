@@ -6,9 +6,7 @@ import itertools
 import sys
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from assignment import Assignment
-from category import Category
-from student import AssignmentGrade, Clobber, GradeReport, Multiplier, Student
+from student import Assignment, Category, Clobber, GradeReport, Multiplier, Student
 
 def import_categories(path: str) -> Dict[str, Category]:
     """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
@@ -90,8 +88,9 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                 # Skip students not in roster.
                 continue
 
-            grades: Dict[str, AssignmentGrade] = {}
-            for assignment_name in assignments:
+            # Create the base dict of student assignments.
+            student_assignments = copy.deepcopy(assignments)
+            for assignment_name in student_assignments:
                 assignment_lateness_header = f'{assignment_name} - Lateness (H:M:S)'
                 assignment_max_points_header = f'{assignment_name} - Max Points'
 
@@ -118,13 +117,11 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                     # No column for assignment; assume 0.0.
                     score = 0.0
                     lateness = datetime.timedelta(0)
+                student_assignments[assignment_name].grade = Assignment.Grade(score, lateness)
 
-                grade = AssignmentGrade(assignment_name, score, lateness)
-                grades[assignment_name] = grade
-
-            # Mutate students to add fresh copies of their grades.
+            # Copy this dict to each student.
             for student in students[sid]:
-                student.grades = copy.deepcopy(grades)
+                student.assignments = copy.deepcopy(student_assignments)
     return students
 
 def apply_policy(policy: Callable[[Student], List[Student]], students: Dict[int, List[Student]]) -> None:
@@ -158,7 +155,7 @@ def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
             drop_adjust = int(row['Drop Adjust'])
             slip_day_adjust = int(row['Slip Day Adjust'])
             if category not in student.categories:
-                # If not present in student.categories, it wasn't present in categories CSV.
+                # If not present, it wasn't present in categories CSV.
                 raise RuntimeError(f'Accommodations reference nonexistent category {category}')
             new_student.categories[category].drops += drop_adjust
             new_student.categories[category].slip_days += slip_day_adjust
@@ -188,10 +185,10 @@ def make_extensions(path: str) -> Callable[[Student], List[Student]]:
         for row in extensions[new_student.sid]:
             assignment_name = row['Assignment']
             days = int(row['Days'])
-            if assignment_name not in student.grades:
-                # If not present in grade_possibility, it wasn't present in assignments CSV.
+            if assignment_name not in student.assignments:
+                # If not present, it wasn't present in assignments CSV.
                 raise RuntimeError(f'Extension references unknown assignment {assignment_name}')
-            grade = new_student.grades[assignment_name]
+            grade = new_student.assignments[assignment_name].grade
             grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
         return [new_student]
     return apply
@@ -228,10 +225,9 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
             category = student.categories[category_name]
             # Get all slip groups that the student has late in the category.
             category_slip_groups: Set[int] = set()
-            for grade in student.grades.values():
-                assignment = student.assignments[grade.assignment_name]
-                if assignment.category == category.name and assignment.slip_group != -1 and grade.lateness > zero:
-                    category_slip_groups.add(student.assignments[grade.assignment_name].slip_group)
+            for assignment in student.assignments.values():
+                if assignment.category == category.name and assignment.slip_group != -1 and assignment.grade.lateness > zero:
+                    category_slip_groups.add(assignment.slip_group)
 
             # Get all possible ways of applying slip days.
             category_slip_possibilities = get_slip_possibilities(len(category_slip_groups), category.slip_days)
@@ -254,10 +250,10 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
                 for i in range(len(category_slip_groups_list)):
                     slip_group = category_slip_groups_list[i]
                     slip_days = category_slip_possibility[i]
-                    for grade in student_with_slip.grades.values():
-                        if student.assignments[grade.assignment_name].slip_group == slip_group:
-                            grade.lateness = max(grade.lateness - datetime.timedelta(days=slip_days), zero)
-                            grade.comments.append(f'{slip_days} slip days applied')
+                    for assignment in student_with_slip.assignments.values():
+                        if assignment.slip_group == slip_group:
+                            assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
+                            assignment.grade.comments.append(f'{slip_days} slip days applied')
             new_students.append(student_with_slip)
 
         return new_students
@@ -292,14 +288,12 @@ def make_late_multiplier() -> Callable[[Student], List[Student]]:
 
         # Build dict mapping slip groups to maximal number of days late.
         slip_group_lateness: Dict[int, datetime.timedelta] = {}
-        for grade in new_student.grades.values():
-            assignment = student.assignments[grade.assignment_name]
-            if grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or grade.lateness > slip_group_lateness[assignment.slip_group]):
-                slip_group_lateness[assignment.slip_group] = grade.lateness
+        for assignment in new_student.assignments.values():
+            if assignment.grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or assignment.grade.lateness > slip_group_lateness[assignment.slip_group]):
+                slip_group_lateness[assignment.slip_group] = assignment.grade.lateness
 
         # Apply lateness.
-        for grade in new_student.grades.values():
-            assignment = student.assignments[grade.assignment_name]
+        for assignment in new_student.assignments.values():
             category = student.categories[assignment.category]
 
             # Lateness is based on individual assignment if no slip group, else use early maximal value.
@@ -307,7 +301,7 @@ def make_late_multiplier() -> Callable[[Student], List[Student]]:
             if assignment.slip_group in slip_group_lateness:
                 days_late = get_days_late(slip_group_lateness[assignment.slip_group])
             else:
-                days_late = get_days_late(grade.lateness)
+                days_late = get_days_late(assignment.grade.lateness)
 
             if days_late > 0:
                 late_multipliers: List[float]
@@ -322,7 +316,7 @@ def make_late_multiplier() -> Callable[[Student], List[Student]]:
                 else:
                     # Student submitted past latest possible time.
                     multiplier = 0.0
-                grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+                assignment.grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
 
         return [new_student]
 
@@ -373,11 +367,11 @@ def make_clobbers(path: str) -> Callable[[Student], List[Student]]:
                 if category_clobber is not None:
                     raise NotImplementedError('Category clobbers not yet implemented')
             for assignment_index in range(len(assignment_names)):
-                assignment_name = assignment_names[assignment_index]
+                assignment = student.assignments[assignment_names[assignment_index]]
                 assignment_clobber = assignment_possibility[assignment_index]
                 if assignment_clobber is not None:
-                    new_student.grades[assignment_name].clobber = copy.deepcopy(assignment_clobber)
-                    new_student.grades[assignment_name].comments.append(f'Clobbered by {clobber.source} using {clobber.clobber_type.value} at {clobber.scale} scale')
+                    assignment.grade.clobber = copy.deepcopy(assignment_clobber)
+                    assignment.grade.comments.append(f'Clobbered by {clobber.source} using {clobber.clobber_type.value} at {clobber.scale} scale')
             new_students.append(new_student)
         return new_students
     return apply
@@ -410,11 +404,11 @@ def make_drops() -> Callable[[Student], List[Student]]:
             for category_index in range(len(drop_possibility)):
                 category_possibility = drop_possibility[category_index]
                 for assignment_index in range(len(category_possibility)):
-                    assignment_name = drop_assignments[category_index][assignment_index]
+                    assignment = new_student.assignments[drop_assignments[category_index][assignment_index]]
                     should_drop = category_possibility[assignment_index]
                     if should_drop:
-                        new_student.grades[assignment_name].dropped = True
-                        new_student.grades[assignment_name].comments.append('Dropped')
+                        assignment.grade.dropped = True
+                        assignment.grade.comments.append('Dropped')
             new_students.append(new_student)
         return new_students
     return apply
@@ -439,11 +433,12 @@ def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Studen
             return [student]
         new_student = copy.deepcopy(student)
         for assignment_name in comments[new_student.sid]:
-            if assignment_name not in student.grades:
-                # If not present in grade_possibility, it wasn't present in assignments CSV.
+            if assignment_name not in student.assignments:
+                # If not present, it wasn't present in assignments CSV.
                 raise RuntimeError(f'Comment references unknown assignment {assignment_name}')
+            assignment = new_student.assignments[assignment_name]
             assignment_comments = comments[new_student.sid][assignment_name]
-            new_student.grades[assignment_name].comments.extend(assignment_comments)
+            assignment.grade.comments.extend(assignment_comments)
         return [new_student]
     return apply
 
