@@ -502,8 +502,10 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     # Derive output rows.
     header = ['SID', 'Name', 'Total Score', 'Percentile']
     for category in categories.values():
-        header.append(f'Category: {category.name} - Score')
+        header.append(f'Category: {category.name} - Raw Score')
+        header.append(f'Category: {category.name} - Adjusted Score')
         header.append(f'Category: {category.name} - Weighted Score')
+        header.append(f'Category: {category.name} - Comments')
     for assignment in assignments.values():
         header.append(f'{assignment.name} - Raw Score')
         header.append(f'{assignment.name} - Adjusted Score')
@@ -513,15 +515,16 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     for sid in students:
         grade_report = grade_reports[sid]
         row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
-        absent_category = ('no grades found', 'no grades found')
-        absent_assignment = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
+        absent = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
             if category.name in grade_report.categories:
                 category_report = grade_report.categories[category.name]
+                row.append(category_report.raw)
                 row.append(category_report.adjusted)
                 row.append(category_report.weighted)
+                row.append(category_report.comment)
             else:
-                row.extend(absent_category)
+                row.extend(absent)
         for assignment in assignments.values():
             if assignment.name in grade_report.assignments:
                 assignment_report = grade_report.assignments[assignment.name]
@@ -530,7 +533,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
                 row.append(assignment_report.weighted)
                 row.append(assignment_report.comment)
             else:
-                row.extend(absent_assignment)
+                row.extend(absent)
         rows.append(row)
 
     # Compute percentiles.

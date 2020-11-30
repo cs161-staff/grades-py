@@ -63,12 +63,14 @@ class AssignmentGrade:
 
 class GradeReport:
     class CategoryEntry:
-        def __init__(self, adjusted: float, weighted: float) -> None:
+        def __init__(self, raw: float, adjusted: float, weighted: float, comment: str) -> None:
+            self.raw = raw
             self.adjusted = adjusted
             self.weighted = weighted
+            self.comment = comment
 
         def __repr__(self) -> str:
-            return f'GradeReport.CategoryEntry({self.adjusted}, {self.weighted})'
+            return f'GradeReport.CategoryEntry({self.raw}, {self.adjusted}, {self.weighted}, {self.comment})'
 
     class AssignmentEntry:
         def __init__(self, raw: float, adjusted: float, weighted: float, comment: str) -> None:
@@ -141,9 +143,11 @@ class Student:
                 else:
                     assignment_entry.weighted = 0.0
 
-            category_grade = category_numerator / category_denominator if category_denominator > 0.0 else 0.0
-            category_weighted_grade = category_grade * category.weight
+            category_raw_grade = category_numerator / category_denominator if category_denominator > 0.0 else 0.0
+            category_adjusted_grade = category_raw_grade # TODO Clobbers.
+            category_weighted_grade = category_adjusted_grade * category.weight
+            category_comment = ''
             grade_report.total_grade += category_weighted_grade
 
-            grade_report.categories[category.name] = GradeReport.CategoryEntry(category_grade, category_weighted_grade)
+            grade_report.categories[category.name] = GradeReport.CategoryEntry(category_raw_grade, category_adjusted_grade, category_weighted_grade, category_comment)
         return grade_report
