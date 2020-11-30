@@ -47,10 +47,10 @@ class AssignmentGrade:
         self.assignment_name = assignment_name
         self.score = score
         self.lateness = lateness
-        self.multipliers_applied: List[Multiplier] = multipliers_applied if multipliers_applied is not None else []
+        self.multipliers_applied = multipliers_applied if multipliers_applied is not None else []
         self.dropped = dropped
         self.clobber = clobber
-        self.comments: List[str] = comments if comments is not None else []
+        self.comments = comments if comments is not None else []
 
     def get_score(self) -> float:
         score = self.score
@@ -84,8 +84,8 @@ class GradeReport:
 
     def __init__(self, total_grade: float = 0.0, categories: Dict[str, 'GradeReport.CategoryEntry'] = None, assignments: Dict[str, 'GradeReport.AssignmentEntry'] = None) -> None:
         self.total_grade = total_grade
-        self.categories: Dict[str, GradeReport.CategoryEntry] = categories if categories is not None else {}
-        self.assignments: Dict[str, GradeReport.AssignmentEntry] = assignments if assignments is not None else {}
+        self.categories = categories if categories is not None else {}
+        self.assignments = assignments if assignments is not None else {}
 
     def __repr__(self) -> str:
         return f'GradeReport({self.total_grade}, {self.categories}, {self.assignments})'
@@ -94,9 +94,9 @@ class Student:
     def __init__(self, sid: int, name: str, drops: Dict[str, int] = None, slip_days: Dict[str, int] = None, grades: Dict[str, AssignmentGrade] = None) -> None:
         self.sid = sid
         self.name = name
-        self.drops: Dict[str, int] = drops if drops is not None else {}
-        self.slip_days: Dict[str, int] = slip_days if slip_days is not None else {}
-        self.grades: Dict[str, AssignmentGrade] = grades if grades is not None else {}
+        self.drops = drops if drops is not None else {}
+        self.slip_days = slip_days if slip_days is not None else {}
+        self.grades = grades if grades is not None else {}
 
     def __repr__(self) -> str:
         return f'Student({self.sid}, {self.name}, {self.drops}, {self.slip_days}, {self.grades})'
