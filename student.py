@@ -104,7 +104,7 @@ class Student:
     def get_grade_report(self, assignments: Dict[str, Assignment], categories: Dict[str, Category]) -> GradeReport:
         grade_report = GradeReport()
         for category in categories.values():
-            assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
+            assignments_in_category = list(assignment for assignment in assignments.values() if assignment.category == category.name)
             category_numerator = 0.0 # Category-weighted grades on assignments
             category_denominator = 0.0 # Total assignment weights
 

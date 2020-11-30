@@ -230,7 +230,7 @@ def make_slip_days(assignments: Dict[str, Assignment], categories: Dict[str, Cat
         for i in range(slip_days + 1):
             # i is the number of slip days used for the first assignment.
             rest = get_slip_possibilities(num_assignments - 1, slip_days - i)
-            rest = list(map(lambda possibility: [i] + possibility, rest))
+            rest = [[i] + possibility for possibility in rest]
             possibilities.extend(rest)
         return possibilities
 
@@ -430,10 +430,10 @@ def make_drops(assignments: Dict[str, Assignment], categories: Dict[str, Categor
         for category in categories.values():
             # Get all ways to assign drops to assignments in the category.
             drops = student.drops[category.name]
-            assignments_in_category = list(filter(lambda assignment: assignment.category == category.name, assignments.values()))
+            assignments_in_category = [assignment for assignment in assignments.values() if assignment.category == category.name]
             category_possibility = tuple(i < drops for i in range(len(assignments_in_category)))
 
-            drop_assignments.append(list(assignment.name for assignment in assignments_in_category))
+            drop_assignments.append([assignment.name for assignment in assignments_in_category])
             drop_possibilities.append(tuple(sorted(set(itertools.permutations(category_possibility)))))
 
         new_students: List[Student] = []
