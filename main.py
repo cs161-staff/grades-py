@@ -258,6 +258,9 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
                 for i in range(len(category_slip_groups_list)):
                     slip_group = category_slip_groups_list[i]
                     slip_days = category_slip_possibility[i]
+                    if slip_days == 0:
+                        # Not applying slip days for this group for this possibility, so skip.
+                        continue
                     for assignment in student_with_slip.assignments.values():
                         if assignment.slip_group == slip_group:
                             assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
