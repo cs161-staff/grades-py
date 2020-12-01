@@ -142,7 +142,7 @@ class Student:
                 category_adjusted_grade = category_raw_grade
             category_weighted_grade = category_adjusted_grade * category.weight
             category_comments = list(category.comments)
-            grade_report.categories[category.name] = GradeReport.CategoryEntry(category_raw_grade, category_adjusted_grade, category_weighted_grade, [])
+            grade_report.categories[category.name] = GradeReport.CategoryEntry(category_raw_grade, category_adjusted_grade, category_weighted_grade, category_comments)
 
             # Add to total grade.
             grade_report.total_grade += category_weighted_grade
