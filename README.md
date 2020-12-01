@@ -102,6 +102,19 @@ we allow drops to any arbitrary assignment, which can affect category scores in
 different ways. Thus, for all assignments to be weighted equally, you may have a
 `1.0` in every assignment.
 
+### Overrides CSV
+
+The overrides CSV defines student-specific grade overrides. This exists so that
+Gradescope exports can be used without a pre-processing step every time it is
+re-downloaded from Gradescope, instead keeping one-off changes in a sepaate data
+file. The following columns are required:
+
+| Column | Description |
+| ------ | ----------- |
+| `SID` | The student's SID |
+| `Assignment` | The name of the assignment being overriden |
+| `Score` | The overridden score, as a raw number of points |
+
 ### Clobber CSV
 
 The clobber CSV defines categories that should clobber each other, where a

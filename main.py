@@ -59,7 +59,32 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
             assignments[name] = Assignment(name, category, score_possible, weight, slip_group)
     return assignments
 
-def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dict[str, Category], assignments: Dict[str, Assignment]) -> Dict[int, List[Student]]:
+def import_overrides(path: str, assignments: Dict[str, Assignment]) -> Dict[int, Dict[str, float]]:
+    """Imports overrides from the CSV file at the given path.
+
+    :param path: The path of the overrides CSV.
+    :type path: str
+    :param assignments: The assignments being overridden.
+    :type assignments: dict
+    :returns: A nested dict mapping SIDs to assignment names to overridden scores.
+    :rtype: dict
+    """
+    overrides: Dict[int, Dict[str, float]] = {}
+    with open(path) as override_file:
+        reader = csv.DictReader(override_file)
+        for row in reader:
+            sid = int(row['SID'])
+            assignment_name = row['Assignment']
+            score = float(row['Score'])
+            if assignment_name not in assignments:
+                raise RuntimeError(f'Override for {sid} references unknown assignment {assignment_name}')
+            overrides.setdefault(sid, {})
+            if assignment_name in overrides[sid]:
+                raise RuntimeError(f'Duplicate override of {assignment_name} for {sid}')
+            overrides[sid][assignment_name] = score
+    return overrides
+
+def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dict[str, Category], assignments: Dict[str, Assignment], overrides: Optional[Dict[int, Dict[str, float]]] = None) -> Dict[int, List[Student]]:
     """Imports the CalCentral roster in the CSV file at the given path and then initializes students with the grades present in the given Gradescope grade report.
 
     :param roster_path: The path of the CalCentral roster.
@@ -70,6 +95,8 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
     :type categories: dict
     :param assignments: The assignments to initialize the students with.
     :type assignments: dict
+    :param overrides: Grade overrides for individual students.
+    :type overrides: dict
     :returns: A dict mapping student IDs to a one-element list of students.
     :rtype: dict
     """
@@ -94,13 +121,14 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
 
             # Create the base dict of student assignments.
             student_assignments = copy.deepcopy(assignments)
-            for assignment_name in student_assignments:
-                assignment_lateness_header = f'{assignment_name} - Lateness (H:M:S)'
-                assignment_max_points_header = f'{assignment_name} - Max Points'
+            for assignment in student_assignments.values():
+                assignment_lateness_header = f'{assignment.name} - Lateness (H:M:S)'
+                assignment_max_points_header = f'{assignment.name} - Max Points'
 
                 score: float
-                if assignment_name in row:
-                    scorestr = row[assignment_name]
+                comments: List[str] = []
+                if assignment.name in row:
+                    scorestr = row[assignment.name]
                     if scorestr != '':
                         score = float(scorestr)
                         # Lateness formatted as HH:MM:SS.
@@ -113,6 +141,12 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                         # Take min with max score possible on Gradescope.
                         max_score = float(row[assignment_max_points_header])
                         score = min(max_score, score)
+
+                        if overrides is not None and sid in overrides and assignment.name in overrides[sid]:
+                            # Overridden.
+                            new_score = overrides[sid][assignment.name]
+                            comments.append(f'Overridden from {score}/{assignment.score_possible} to {new_score}/{assignment.score_possible}')
+                            score = new_score
                     else:
                         # Empty string score string means no submission; assume 0.0.
                         score = 0.0
@@ -121,10 +155,10 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                     # No column for assignment; assume 0.0.
                     score = 0.0
                     lateness = datetime.timedelta(0)
-                    if assignment_name not in not_present_names:
-                        not_present_names.add(assignment_name)
-                        print(f'Warning: No grades present for {assignment_name}', file=sys.stderr)
-                student_assignments[assignment_name].grade = Assignment.Grade(score, lateness)
+                    if assignment.name not in not_present_names:
+                        not_present_names.add(assignment.name)
+                        print(f'Warning: No grades present for {assignment.name}', file=sys.stderr)
+                student_assignments[assignment.name].grade = Assignment.Grade(score, lateness, comments=comments)
 
             # Copy this dict to each student.
             for student in students[sid]:
@@ -603,6 +637,7 @@ def main(args: argparse.Namespace) -> None:
     roster_path = args.roster
     categories_path = args.categories
     assignments_path = args.assignments
+    overrides_path = args.overrides
     grades_path = args.grades
     clobbers_path = args.clobbers
     extensions_path = args.extensions
@@ -611,7 +646,12 @@ def main(args: argparse.Namespace) -> None:
 
     categories = import_categories(categories_path)
     assignments = import_assignments(assignments_path, categories)
-    students = import_roster_and_grades(roster_path, grades_path, categories, assignments)
+    overrides: Optional[Dict[int, Dict[str, float]]]
+    if overrides_path is not None:
+        overrides = import_overrides(overrides_path, assignments)
+    else:
+        overrides = None
+    students = import_roster_and_grades(roster_path, grades_path, categories, assignments, overrides)
 
     if accommodations_path:
         students = apply_policy(make_accommodations(accommodations_path), students)
@@ -632,6 +672,7 @@ if __name__ == '__main__':
     parser.add_argument('grades', help='CSV grades downloaded from Gradescope')
     parser.add_argument('categories', help='CSV with assignment categories')
     parser.add_argument('assignments', help='CSV with assignments')
+    parser.add_argument('--overrides', '-d', help='CSV with score overrides')
     parser.add_argument('--clobbers', '-c', help='CSV with clobbers')
     parser.add_argument('--extensions', '-e', help='CSV with extensions')
     parser.add_argument('--accommodations', '-a', help='CSV with accommodations for drops and slip days')
