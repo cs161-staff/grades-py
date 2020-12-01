@@ -121,10 +121,21 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                 student.assignments = copy.deepcopy(student_assignments)
     return students
 
-def apply_policy(policy: Callable[[Student], List[Student]], students: Dict[int, List[Student]]) -> None:
+def apply_policy(policy: Callable[[Student], List[Student]], students: Dict[int, List[Student]]) -> Dict[int, List[Student]]:
+    """Applies a policy function by flat mapping the returned list of outputs for each input student into a new iterable and returning it.
+
+    :param policy: The policy function to apply.
+    :type policy: callable
+    :param students: The input students.
+    :type students: list
+    :returns: The SIDs mapped to the new students.
+    :rtype: dict
+    """
+    new_students: Dict[int, List[Student]] = {}
     for sid in students.keys():
-        students[sid] = [new_student for student in students[sid] for new_student in policy(student)]
-        assert len(students[sid]) > 0, 'Policy function returned an empty list'
+        new_students[sid] = [new_student for student in students[sid] for new_student in policy(student)]
+        assert len(new_students[sid]) > 0, 'Policy function returned an empty list'
+    return new_students
 
 def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies the accommodations in the CSV at the given path.
@@ -588,15 +599,15 @@ def main(args: argparse.Namespace) -> None:
     students = import_roster_and_grades(roster_path, grades_path, categories, assignments)
 
     if accommodations_path:
-        apply_policy(make_accommodations(accommodations_path), students)
+        students = apply_policy(make_accommodations(accommodations_path), students)
     if extensions_path:
-        apply_policy(make_extensions(extensions_path), students)
-    apply_policy(make_slip_days(), students)
-    apply_policy(make_late_multiplier(), students)
-    apply_policy(make_drops(), students)
+        students = apply_policy(make_extensions(extensions_path), students)
+    students = apply_policy(make_slip_days(), students)
+    students = apply_policy(make_late_multiplier(), students)
+    students = apply_policy(make_drops(), students)
     if clobbers_path:
-        apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
-    apply_policy(make_comments(COMMENTS), students)
+        students = apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
+    students = apply_policy(make_comments(COMMENTS), students)
 
     dump_students(students, assignments, categories, rounding)
 
