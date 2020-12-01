@@ -3,10 +3,11 @@ import copy
 import csv
 import datetime
 import itertools
+import statistics
 import sys
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from student import Assignment, Category, Clobber, GradeReport, Multiplier, Student
+from student import Assignment, Category, GradeReport, Multiplier, Student
 
 def import_categories(path: str) -> Dict[str, Category]:
     """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
@@ -322,60 +323,6 @@ def make_late_multiplier() -> Callable[[Student], List[Student]]:
 
     return apply
 
-def make_clobbers(path: str) -> Callable[[Student], List[Student]]:
-    category_clobbers: Dict[str, List[Clobber]] = {}
-    assignment_clobbers: Dict[str, List[Clobber]] = {}
-    with open(path) as clobbers_file:
-        reader = csv.DictReader(clobbers_file)
-        for row in reader:
-            scope = row['Scope']
-            target = row['Target']
-            source = row['Source']
-            scale = float(row['Scale'])
-            clobber_type = Clobber.Type(row['Type'])
-            clobber = Clobber(clobber_type, source, scale)
-            if scope == 'CATEGORY':
-                category_clobbers.setdefault(target, []).append(clobber)
-            elif scope == 'ASSIGNMENT':
-                assignment_clobbers.setdefault(target, []).append(clobber)
-            else:
-                raise RuntimeError(f'Unknown clobber scope {scope}')
-
-
-    def apply(student: Student) -> List[Student]:
-        # category_names[i] has possible clobbers category_possibilities[i].
-        category_names = tuple(student.categories.keys())
-        category_possibilities = tuple((None, *category_clobbers.get(name, [])) for name in category_names)
-        # assignment_names[i] has possibe clobbers assignment_possibilities[i].
-        assignment_names = tuple(student.assignments.keys())
-        assignment_possibilities = tuple((None, *assignment_clobbers.get(name, [])) for name in assignment_names)
-
-        # Compute all possibilities of applying clobbers.
-        possibilities = tuple(itertools.product(itertools.product(*category_possibilities), itertools.product(*assignment_possibilities)))
-
-        new_students = [student]
-        for possibility in possibilities:
-            if all(clobber is None for subpossibilities in possibility for clobber in subpossibilities):
-                # Skip if all clobbers are None, since this is already part of the original student.
-                continue
-            category_possibility = possibility[0]
-            assignment_possibility = possibility[1]
-            new_student = copy.deepcopy(student)
-            for category_index in range(len(category_names)):
-                category_name = category_names[category_index]
-                category_clobber = category_possibility[category_index]
-                if category_clobber is not None:
-                    raise NotImplementedError('Category clobbers not yet implemented')
-            for assignment_index in range(len(assignment_names)):
-                assignment = student.assignments[assignment_names[assignment_index]]
-                assignment_clobber = assignment_possibility[assignment_index]
-                if assignment_clobber is not None:
-                    assignment.grade.clobber = copy.deepcopy(assignment_clobber)
-                    assignment.grade.comments.append(f'Clobbered by {clobber.source} using {clobber.clobber_type.value} at {clobber.scale} scale')
-            new_students.append(new_student)
-        return new_students
-    return apply
-
 def make_drops() -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies drops per categories.
 
@@ -413,6 +360,111 @@ def make_drops() -> Callable[[Student], List[Student]]:
         return new_students
     return apply
 
+def make_clobbers(path: str, category_names: List[str], assignment_names: List[str], students: Dict[int, List[Student]]) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that applies clobbers based on the statistics in preliminary grade reports.
+
+    Clobbers are applied by returning every possibility of applying clobbers via assignment and category overrides.
+
+    :param path: The path of the clobbers CSV.
+    :type path: str
+    :param students: The students from which to generate preliminary grade reports.
+    :type students: dict
+    :returns: A clobber policy function.
+    :rtype: callable
+    """
+    def zscore_clobber(source_score: float, source_mean: float, source_stdev: float, target_mean: float, target_stdev: float) -> float:
+        return target_mean + target_stdev * (source_score - source_stdev) / source_mean
+
+    prelim_reports = generate_grade_reports(students)
+
+    category_clobbers: Dict[int, Dict[str, Tuple[str, float]]] = {} # SID -> target name -> (source, score)
+    assignment_clobbers: Dict[int, Dict[str, Tuple[str, float]]] = {}
+    with open(path) as clobbers_file:
+        reader = csv.DictReader(clobbers_file)
+        for row in reader:
+            scope = row['Scope']
+            target = row['Target']
+            source = row['Source']
+            scale = float(row['Scale'])
+            clobber_type = row['Type']
+            for sid in prelim_reports:
+                if scope == 'CATEGORY':
+                    source_score = prelim_reports[sid].categories[source].adjusted
+                elif scope == 'ASSIGNMENT':
+                    source_score = prelim_reports[sid].assignments[source].adjusted
+                else:
+                    raise RuntimeError(f'Unknown clobber scope {scope}')
+                if clobber_type == 'SCALED':
+                    new_score = source_score
+                elif clobber_type == 'ZSCORE':
+                    if scope == 'CATEGORY':
+                        source_mean = statistics.mean(report.categories[source].adjusted for report in prelim_reports.values())
+                        source_stdev = statistics.stdev(report.categories[source].adjusted for report in prelim_reports.values())
+                        target_mean = statistics.mean(report.categories[target].adjusted for report in prelim_reports.values())
+                        target_stdev = statistics.stdev(report.categories[target].adjusted for report in prelim_reports.values())
+                    else: # scope == 'ASSIGNMENT'
+                        source_mean = statistics.mean(report.assignments[source].adjusted for report in prelim_reports.values())
+                        source_stdev = statistics.stdev(report.assignments[source].adjusted for report in prelim_reports.values())
+                        target_mean = statistics.mean(report.assignments[target].adjusted for report in prelim_reports.values())
+                        target_stdev = statistics.stdev(report.assignments[target].adjusted for report in prelim_reports.values())
+                    new_score = zscore_clobber(source_score, source_mean, source_stdev, target_mean, target_stdev)
+                new_score *= scale
+                if scope == 'CATEGORY':
+                    category_clobbers.setdefault(sid, {}).setdefault(target, ('', -float('inf')))
+                    if category_clobbers[sid][target][1] < new_score:
+                        category_clobbers[sid][target] = (source, new_score)
+                else:
+                    assignment_clobbers.setdefault(sid, {}).setdefault(target, ('', -float('inf')))
+                    if assignment_clobbers[sid][target][1] < new_score:
+                        assignment_clobbers[sid][target] = (source, new_score)
+
+    def get_binary_combinations(n: int) -> List[List[bool]]:
+        if n == 0:
+            return [[]]
+        rest = get_binary_combinations(n - 1)
+        ret = []
+        for r in rest:
+            ret.append([False, *r])
+            ret.append([True, *r])
+        return ret
+
+    def apply(student: Student) -> List[Student]:
+        # category_names[i] has combinations category_combinations[i].
+        if student.sid in category_clobbers:
+            category_names = [name for name in category_clobbers[student.sid] if student.categories[name].override is None]
+        else:
+            category_names = []
+        category_combinations = get_binary_combinations(len(category_names))
+        # assignment_names[i] has combinations assignment_combinations[i].
+        if student.sid in assignment_clobbers:
+            assignment_names = [name for name in assignment_clobbers[student.sid] if student.assignments[name].grade.override is None]
+        else:
+            assignment_names = []
+        assignment_combinations = get_binary_combinations(len(assignment_names))
+
+        new_students: List[Student] = []
+        for combination in itertools.product(category_combinations, assignment_combinations):
+            new_student = copy.deepcopy(student)
+            category_combination = combination[0]
+            assignment_combination = combination[1]
+            for i in range(len(category_combination)):
+                if category_combination[i]:
+                    category_name = category_names[i]
+                    category_clobber = category_clobbers[student.sid][category_name]
+                    category = new_student.categories[category_name]
+                    category.override = category_clobber[1]
+                    category.comments.append(f'Clobbered by {category_clobber[0]}')
+            for i in range(len(assignment_combination)):
+                if assignment_combination[i]:
+                    assignment_name = assignment_names[i]
+                    assignment_clobber = assignment_clobbers[student.sid][assignment_name]
+                    assignment = new_student.assignments[assignment_name]
+                    assignment.grade.override = assignment_clobber[1] * assignment.score_possible
+                    assignment.grade.comments.append(f'Clobbered by {assignment_clobber[0]}')
+            new_students.append(new_student)
+        return new_students
+    return apply
+
 # TODO Put this in another CSV or something.
 COMMENTS = {
     12345678: {
@@ -442,6 +494,15 @@ def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Studen
         return [new_student]
     return apply
 
+def generate_grade_reports(students: Dict[int, List[Student]]) -> Dict[int, GradeReport]:
+    grade_reports: Dict[int, GradeReport] = {}
+    for sid in students:
+        for student in students[sid]:
+            grade_report = student.get_grade_report()
+            if sid not in grade_reports or grade_report.total_grade > grade_reports[sid].total_grade:
+                grade_reports[sid] = grade_report
+    return grade_reports
+
 def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
     """Dumps students as a CSV to stdout.
 
@@ -454,13 +515,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     :param rounding: The number of decimal places to round to, or None if no rounding.
     :type rounding: int
     """
-    grade_reports: Dict[int, GradeReport] = {}
-
-    for sid in students:
-        for student in students[sid]:
-            grade_report = student.get_grade_report()
-            if sid not in grade_reports or grade_report.total_grade > grade_reports[sid].total_grade:
-                grade_reports[sid] = grade_report
+    grade_reports = generate_grade_reports(students)
 
     # Derive output rows.
     header = ['SID', 'Name', 'Total Score', 'Percentile']
@@ -477,7 +532,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     rows: List[List[Any]] = [header]
     for sid in students:
         grade_report = grade_reports[sid]
-        row: List[Any] = [student.sid, student.name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
+        row: List[Any] = [students[sid][0].sid, students[sid][0].name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
         absent = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
             if category.name in grade_report.categories:
@@ -485,7 +540,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
                 row.append(category_report.raw)
                 row.append(category_report.adjusted)
                 row.append(category_report.weighted)
-                row.append(category_report.comment)
+                row.append(', '.join(category_report.comments))
             else:
                 row.extend(absent)
         for assignment in assignments.values():
@@ -494,7 +549,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
                 row.append(assignment_report.raw)
                 row.append(assignment_report.adjusted)
                 row.append(assignment_report.weighted)
-                row.append(assignment_report.comment)
+                row.append(', '.join(assignment_report.comments))
             else:
                 row.extend(absent)
         rows.append(row)
@@ -544,7 +599,7 @@ def main(args: argparse.Namespace) -> None:
     apply_policy(make_late_multiplier(), students)
     apply_policy(make_drops(), students)
     if clobbers_path:
-        apply_policy(make_clobbers(clobbers_path), students)
+        apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
     apply_policy(make_comments(COMMENTS), students)
 
     dump_students(students, assignments, categories, rounding)

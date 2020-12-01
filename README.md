@@ -113,14 +113,13 @@ highest of the two. The following columns are required:
 | `Scope` | The type of item clobbered, either `ASSIGNMENT` or `CATEGORY` |
 | `From` | The name of the assignment or category as the source of the clobber |
 | `To` | The name of the assignment or category being clobbered |
-| `Type` | The method of calculating clobbers, either `ZSCORE`, `SCALED`, or `ABSOLUTE` |
+| `Type` | The method of calculating clobbers, either `ZSCORE` or `SCALED` |
 | `Scale` | The percentage to clobber by, in decimal. `1.0` is a full clobber, `0.8` is an 80% clobber, etc. |
 
 **Z-score** clobbers convert the student's score to a Z-score using the mean and
 standard deviation and then applies that Z-score to the clobber assignment using
 its mean and standard deviation. **Scaled** clobbers take the percentage earned
 on the assignment and applies that percentage to the clobbered assignment.
-**Absolute** clobbers apply the raw points to the clobbered assignment.
 
 Partial clobbers mean that the final score will be a fractional portion of the
 resulting clobber score. For example, if you scored 80% on the final, which
