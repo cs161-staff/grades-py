@@ -9,6 +9,9 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from student import Assignment, Category, GradeReport, Multiplier, Student
 
+# TODO Put this in a config.
+VERBOSE_COMMENTS = True
+
 def import_categories(path: str) -> Dict[str, Category]:
     """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
 
@@ -167,6 +170,11 @@ def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
                 raise RuntimeError(f'Accommodations reference nonexistent category {category}')
             new_student.categories[category].drops += drop_adjust
             new_student.categories[category].slip_days += slip_day_adjust
+            if VERBOSE_COMMENTS:
+                if drop_adjust > 0:
+                    new_student.categories[category].comments.append(f'{drop_adjust} extra drops granted')
+                if slip_day_adjust > 0:
+                    new_student.categories[category].comments.append(f'{slip_day_adjust} extra drops granted')
         return [new_student]
     return apply
 
@@ -198,6 +206,8 @@ def make_extensions(path: str) -> Callable[[Student], List[Student]]:
                 raise RuntimeError(f'Extension references unknown assignment {assignment_name}')
             grade = new_student.assignments[assignment_name].grade
             grade.lateness = max(grade.lateness - datetime.timedelta(days=days), zero)
+            if VERBOSE_COMMENTS:
+                grade.comments.append(f'{days}-day extension granted')
         return [new_student]
     return apply
 
