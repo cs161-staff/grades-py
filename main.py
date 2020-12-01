@@ -82,6 +82,7 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
             students[sid] = [Student(sid, name, categories, assignments)]
     with open(grades_path) as grades_file:
         reader = csv.DictReader(grades_file)
+        not_present_names: Set[str] = set()
         for row in reader:
             try:
                 sid = int(row['SID'])
@@ -120,6 +121,9 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                     # No column for assignment; assume 0.0.
                     score = 0.0
                     lateness = datetime.timedelta(0)
+                    if assignment_name not in not_present_names:
+                        not_present_names.add(assignment_name)
+                        print(f'Warning: No grades present for {assignment_name}', file=sys.stderr)
                 student_assignments[assignment_name].grade = Assignment.Grade(score, lateness)
 
             # Copy this dict to each student.
