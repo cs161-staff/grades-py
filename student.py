@@ -86,13 +86,15 @@ class GradeReport:
         def __repr__(self) -> str:
             return f'GradeReport.AssignmentEntry({self.raw}, {self.adjusted}, {self.weighted}, {self.comments})'
 
-    def __init__(self, total_grade: float = 0.0, categories: Dict[str, 'GradeReport.CategoryEntry'] = None, assignments: Dict[str, 'GradeReport.AssignmentEntry'] = None) -> None:
+    def __init__(self, sid: int, student_name: str, total_grade: float = 0.0, categories: Dict[str, 'GradeReport.CategoryEntry'] = None, assignments: Dict[str, 'GradeReport.AssignmentEntry'] = None) -> None:
+        self.sid = sid
+        self.student_name = student_name
         self.total_grade = total_grade
         self.categories = categories if categories is not None else {}
         self.assignments = assignments if assignments is not None else {}
 
     def __repr__(self) -> str:
-        return f'GradeReport({self.total_grade}, {self.categories}, {self.assignments})'
+        return f'GradeReport({self.sid}, {self.student_name}, {self.total_grade}, {self.categories}, {self.assignments})'
 
 class Student:
     def __init__(self, sid: int, name: str, categories: Dict[str, Category], assignments: Dict[str, Assignment]) -> None:
@@ -105,7 +107,7 @@ class Student:
         return f'Student({self.sid}, {self.name}, {self.categories}, {self.assignments})'
 
     def get_grade_report(self) -> GradeReport:
-        grade_report = GradeReport()
+        grade_report = GradeReport(self.sid, self.name)
         for category in self.categories.values():
             assignments_in_category = list(assignment for assignment in self.assignments.values() if assignment.category == category.name)
             category_numerator = 0.0 # Category-weighted grades on assignments

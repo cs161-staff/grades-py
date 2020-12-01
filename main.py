@@ -528,7 +528,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     rows: List[List[Any]] = [header]
     for sid in students:
         grade_report = grade_reports[sid]
-        row: List[Any] = [students[sid][0].sid, students[sid][0].name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
+        row: List[Any] = [grade_report.sid, grade_report.student_name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
         absent = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
             if category.name in grade_report.categories:
