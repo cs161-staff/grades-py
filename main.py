@@ -10,6 +10,9 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from student import Assignment, Category, GradeReport, Multiplier, Student
 
 # TODO Put this in a config.
+LATE_MULTIPLIER_DESC = 'Late multiplier'
+LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
+LATE_GRACE = datetime.timedelta(minutes=5)
 VERBOSE_COMMENTS = True
 
 def import_categories(path: str) -> Dict[str, Category]:
@@ -280,11 +283,6 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
         return new_students
 
     return apply
-
-# TODO Put this in a config or something.
-LATE_MULTIPLIER_DESC = 'Late multiplier'
-LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
-LATE_GRACE = datetime.timedelta(minutes=5)
 
 def make_late_multiplier() -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies late multipliers.
