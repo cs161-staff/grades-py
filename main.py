@@ -47,11 +47,7 @@ def import_assignments(path: str, categories: Dict[str, Category]) -> Dict[str, 
             category = row['Category']
             score_possible = float(row['Possible'])
             weight = float(row['Weight'])
-            slip_group_str = row['Slip Group']
-            if slip_group_str == None or slip_group_str == '':
-                slip_group = -1
-            else:
-                slip_group = int(slip_group_str)
+            slip_group = int(row['Slip Group'])
             if category not in categories:
                 raise RuntimeError(f'Assignment {name} references unknown category {category}')
             assignments[name] = Assignment(name, category, score_possible, weight, slip_group)

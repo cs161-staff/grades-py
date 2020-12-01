@@ -89,7 +89,7 @@ following columns are required:
 | `Category` | The name of the assignment's category |
 | `Possible` | The number of points possible on the assignment |
 | `Weight` | The weight of the assignment **within the category** |
-| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time) |
+| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time). `-1` if no slip group. |
 
 Note that the `Possible` field is different from the `ASSIGNMENT - Max Points`
 field in the Gradescope export. The former defines the denominator used for
@@ -192,7 +192,7 @@ final grade, and comments showing policies applied for the sake of transparency.
 ## Future Development
 
 This script is written with extensibility in mind, needing only to branch out
-more possibilities or mutating existing possibilities for students. However,
+more possibilities or mutate existing possibilities for students. However,
 ideally, this script will not do more than it needs to, since features such as
 grade bins can be done externally. As a rule of thumb, if you can do it easily
 in Excel, use Excel on the output of this script.
