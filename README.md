@@ -89,7 +89,7 @@ following columns are required:
 | `Category` | The name of the assignment's category |
 | `Possible` | The number of points possible on the assignment |
 | `Weight` | The weight of the assignment **within the category** |
-| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time). `-1` if no slip group. |
+| `Slip Group` | Used to group assignments together so that they share a lateness and slip day application (e.g. a writeup and autograder for the same project due at the same time). A `-1` means that no slip days can be applied, so a standalone assignment must still have its own slip group. |
 
 Note that the `Possible` field is different from the `ASSIGNMENT - Max Points`
 field in the Gradescope export. The former defines the denominator used for
