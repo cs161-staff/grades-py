@@ -315,7 +315,7 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
                     for assignment in student_with_slip.assignments.values():
                         if assignment.slip_group == slip_group:
                             assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
-                            assignment.grade.comments.append(f'{slip_days} slip days applied')
+                            assignment.grade.comments.append(f"{slip_days} slip {'days' if slip_days > 1 else 'day'} applied")
             new_students.append(student_with_slip)
 
         return new_students
