@@ -19,7 +19,7 @@ You will need Python 3 to run this script.
 ## Usage
 
 ```
-python3 main.py <roster> <grades> <categories> <assignments> [--clobbers CLOBBERS] [--extensions EXTENSIONS] [--accommodations ACCOMMODATIONS] > output.csv
+python3 main.py <roster> <grades> <categories> <assignments> [--clobbers CLOBBERS] [--extensions EXTENSIONS] [--accommodations ACCOMMODATIONS] -o output.csv
 ```
 
 ## Input Specifications

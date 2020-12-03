@@ -5,7 +5,7 @@ import datetime
 import itertools
 import statistics
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, TextIO, Tuple
 
 from student import Assignment, Category, GradeReport, Multiplier, Student
 
@@ -559,7 +559,7 @@ def generate_grade_reports(students: Dict[int, List[Student]]) -> Dict[int, Grad
                 grade_reports[sid] = grade_report
     return grade_reports
 
-def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None) -> None:
+def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Assignment], categories: Dict[str, Category], rounding: Optional[int] = None, outfile: TextIO = sys.stdout) -> None:
     """Dumps students as a CSV to stdout.
 
     :param students: The students to dump.
@@ -631,17 +631,18 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
                 if isinstance(row[i], float):
                     row[i] = round(row[i], rounding)
 
-    csv.writer(sys.stdout).writerows(rows)
+    csv.writer(outfile).writerows(rows)
 
 def main(args: argparse.Namespace) -> None:
-    roster_path = args.roster
-    categories_path = args.categories
-    assignments_path = args.assignments
-    overrides_path = args.overrides
+    roster_path: str = args.roster
+    categories_path: str = args.categories
+    assignments_path: str = args.assignments
     grades_path = args.grades
-    clobbers_path = args.clobbers
-    extensions_path = args.extensions
-    accommodations_path = args.accommodations
+    overrides_path: Optional[str] = args.overrides
+    clobbers_path: Optional[str] = args.clobbers
+    extensions_path: Optional[str] = args.extensions
+    accommodations_path: Optional[str] = args.accommodations
+    output_path: Optional[str] = args.output
     rounding = int(args.rounding) if args.rounding else None
 
     categories = import_categories(categories_path)
@@ -664,7 +665,11 @@ def main(args: argparse.Namespace) -> None:
         students = apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
     students = apply_policy(make_comments(COMMENTS), students)
 
-    dump_students(students, assignments, categories, rounding)
+    if output_path is not None:
+        with open(output_path, 'w') as outfile:
+            dump_students(students, assignments, categories, rounding=rounding, outfile=outfile)
+    else:
+        dump_students(students, assignments, categories, rounding=rounding, outfile=sys.stdout)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -677,6 +682,7 @@ if __name__ == '__main__':
     parser.add_argument('--extensions', '-e', help='CSV with extensions')
     parser.add_argument('--accommodations', '-a', help='CSV with accommodations for drops and slip days')
     parser.add_argument('--rounding', '-r', help='Number of decimal places to round to')
+    parser.add_argument('--output', '-o', help='Output CSV file')
     #parser.add_argument('--config', '--c', help='yaml file of configs')
     #parser.add_argument('-v', '--verbose', action='count', help='verbosity')
     args = parser.parse_args()
