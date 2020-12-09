@@ -26,6 +26,7 @@ class Assignment:
     class Grade:
         score: float
         lateness: datetime.timedelta
+        slip_days_applied: int = 0
         multipliers_applied: List[Multiplier] = field(default_factory=list)
         dropped: bool = False
         override: Optional[float] = None

@@ -317,6 +317,7 @@ def slip_day_policy(student: Student) -> List[Student]:
                 for assignment in student_with_slip.assignments.values():
                     if assignment.slip_group == slip_group:
                         assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
+                        assignment.grade.slip_days_applied += slip_days
                         assignment.grade.comments.append(f"{slip_days} slip {'days' if slip_days > 1 else 'day'} applied")
         new_students.append(student_with_slip)
 
@@ -408,6 +409,9 @@ def drop_policy(student: Student) -> List[Student]:
             category_possibility = drop_possibility[category_index]
             for assignment_index in range(len(category_possibility)):
                 assignment = new_student.assignments[drop_assignments[category_index][assignment_index]]
+                if assignment.grade.slip_days_applied > 0:
+                    # Skip possibility if we applied slip days, since we never want to do apply slip days to dropped assignments.
+                    continue
                 should_drop = category_possibility[assignment_index]
                 if should_drop:
                     assignment.grade.dropped = True
