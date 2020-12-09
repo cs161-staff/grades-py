@@ -198,7 +198,7 @@ def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
             sid = int(row['SID'])
             accommodations.setdefault(sid, []).append(row)
 
-    def apply(student: Student) -> List[Student]:
+    def accommodations_policy(student: Student) -> List[Student]:
         if student.sid not in accommodations:
             return [student]
         new_student = copy.deepcopy(student)
@@ -217,7 +217,7 @@ def make_accommodations(path: str) -> Callable[[Student], List[Student]]:
                 if slip_day_adjust > 0:
                     new_student.categories[category].comments.append(f'{slip_day_adjust} extra drops granted')
         return [new_student]
-    return apply
+    return accommodations_policy
 
 def make_extensions(path: str) -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies the extensions in the CSV file.
@@ -235,7 +235,7 @@ def make_extensions(path: str) -> Callable[[Student], List[Student]]:
             extensions.setdefault(sid, []).append(row)
     zero = datetime.timedelta(0)
 
-    def apply(student: Student) -> List[Student]:
+    def extensions_policy(student: Student) -> List[Student]:
         if student.sid not in extensions:
             return [student]
         new_student = copy.deepcopy(student)
@@ -250,15 +250,17 @@ def make_extensions(path: str) -> Callable[[Student], List[Student]]:
             if VERBOSE_COMMENTS:
                 grade.comments.append(f'{days}-day extension granted')
         return [new_student]
-    return apply
+    return extensions_policy
 
-def make_slip_days() -> Callable[[Student], List[Student]]:
-    """Returns a policy function that Applies slip days per category.
+def slip_day_policy(student: Student) -> List[Student]:
+    """A policy function that applies slip days per category.
 
     Slip days are applied using a brute-force method of enumerating all possible ways to assign slip days to assignments. The appropriate lateness is removed from the grade entry, and a comment is added.
 
-    :returns: A slip days policy function.
-    :rtype: callable
+    :param student: The input student.
+    :type student: Student
+    :returns: A list of students containing all possibile ways of applying slip days.
+    :rtype: list
     """
     def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
         # Basically np.meshgrid with max sum <= slip_days.
@@ -275,61 +277,60 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
 
     zero = datetime.timedelta(0)
 
-    def apply(student: Student) -> List[Student]:
-        # slip_groups[i] have slip_possibilities[i].
-        slip_groups: List[Set[int]] = []
-        slip_possibilities: List[List[List[int]]] = []
+    # slip_groups[i] have slip_possibilities[i].
+    slip_groups: List[Set[int]] = []
+    slip_possibilities: List[List[List[int]]] = []
 
-        for category_name in student.categories:
-            category = student.categories[category_name]
-            # Get all slip groups that the student has late in the category.
-            category_slip_groups: Set[int] = set()
-            for assignment in student.assignments.values():
-                if assignment.category == category.name and assignment.slip_group != -1 and assignment.grade.lateness > zero:
-                    category_slip_groups.add(assignment.slip_group)
+    for category_name in student.categories:
+        category = student.categories[category_name]
+        # Get all slip groups that the student has late in the category.
+        category_slip_groups: Set[int] = set()
+        for assignment in student.assignments.values():
+            if assignment.category == category.name and assignment.slip_group != -1 and assignment.grade.lateness > zero:
+                category_slip_groups.add(assignment.slip_group)
 
-            # Get all possible ways of applying slip days.
-            category_slip_possibilities = get_slip_possibilities(len(category_slip_groups), category.slip_days)
+        # Get all possible ways of applying slip days.
+        category_slip_possibilities = get_slip_possibilities(len(category_slip_groups), category.slip_days)
 
-            slip_groups.append(category_slip_groups)
-            slip_possibilities.append(category_slip_possibilities)
+        slip_groups.append(category_slip_groups)
+        slip_possibilities.append(category_slip_possibilities)
 
-        new_students: List[Student] = [student]
+    new_students: List[Student] = [student]
 
-        # All possibilities is the cross product of all possibilities in each category.
-        for slip_possibility in itertools.product(*slip_possibilities):
-            if sum(slip_days for category_slip_possibility in slip_possibility for slip_days in category_slip_possibility) == 0:
-                # Skip 0 slip day application case since it is already present in the list.
-                continue
-            student_with_slip = copy.deepcopy(student)
-            for category_index in range(len(slip_possibility)):
-                category_slip_groups = slip_groups[category_index]
-                category_slip_groups_list = list(category_slip_groups)
-                category_slip_possibility = slip_possibility[category_index]
-                for i in range(len(category_slip_groups_list)):
-                    slip_group = category_slip_groups_list[i]
-                    slip_days = category_slip_possibility[i]
-                    if slip_days == 0:
-                        # Not applying slip days for this group for this possibility, so skip.
-                        continue
-                    student_with_slip.slip_days_used += slip_days
-                    for assignment in student_with_slip.assignments.values():
-                        if assignment.slip_group == slip_group:
-                            assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
-                            assignment.grade.comments.append(f"{slip_days} slip {'days' if slip_days > 1 else 'day'} applied")
-            new_students.append(student_with_slip)
+    # All possibilities is the cross product of all possibilities in each category.
+    for slip_possibility in itertools.product(*slip_possibilities):
+        if sum(slip_days for category_slip_possibility in slip_possibility for slip_days in category_slip_possibility) == 0:
+            # Skip 0 slip day application case since it is already present in the list.
+            continue
+        student_with_slip = copy.deepcopy(student)
+        for category_index in range(len(slip_possibility)):
+            category_slip_groups = slip_groups[category_index]
+            category_slip_groups_list = list(category_slip_groups)
+            category_slip_possibility = slip_possibility[category_index]
+            for i in range(len(category_slip_groups_list)):
+                slip_group = category_slip_groups_list[i]
+                slip_days = category_slip_possibility[i]
+                if slip_days == 0:
+                    # Not applying slip days for this group for this possibility, so skip.
+                    continue
+                student_with_slip.slip_days_used += slip_days
+                for assignment in student_with_slip.assignments.values():
+                    if assignment.slip_group == slip_group:
+                        assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
+                        assignment.grade.comments.append(f"{slip_days} slip {'days' if slip_days > 1 else 'day'} applied")
+        new_students.append(student_with_slip)
 
-        return new_students
+    return new_students
 
-    return apply
-
-def make_late_multiplier() -> Callable[[Student], List[Student]]:
-    """Returns a policy function that applies late multipliers.
+def late_multiplier_policy(student: Student) -> List[Student]:
+    """A policy function that applies late multipliers.
 
     Late multipliers are applied by appending to each grade's multipliers list.
 
-    :returns: A late multiplier policy function.
-    :rtype: callable
+    :param student: The input student.
+    :type student: Student
+    :returns: A one-element list containing a student with late multipliers applied.
+    :rtype: list
     """
     zero = datetime.timedelta(0)
     one = datetime.timedelta(days=1)
@@ -341,81 +342,78 @@ def make_late_multiplier() -> Callable[[Student], List[Student]]:
             days_late += 1
         return days_late
 
-    def apply(student: Student) -> List[Student]:
-        new_student = copy.deepcopy(student)
+    new_student = copy.deepcopy(student)
 
-        # Build dict mapping slip groups to maximal number of days late.
-        slip_group_lateness: Dict[int, datetime.timedelta] = {}
-        for assignment in new_student.assignments.values():
-            if assignment.grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or assignment.grade.lateness > slip_group_lateness[assignment.slip_group]):
-                slip_group_lateness[assignment.slip_group] = assignment.grade.lateness
+    # Build dict mapping slip groups to maximal number of days late.
+    slip_group_lateness: Dict[int, datetime.timedelta] = {}
+    for assignment in new_student.assignments.values():
+        if assignment.grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or assignment.grade.lateness > slip_group_lateness[assignment.slip_group]):
+            slip_group_lateness[assignment.slip_group] = assignment.grade.lateness
 
-        # Apply lateness.
-        for assignment in new_student.assignments.values():
-            category = student.categories[assignment.category]
+    # Apply lateness.
+    for assignment in new_student.assignments.values():
+        category = student.categories[assignment.category]
 
-            # Lateness is based on individual assignment if no slip group, else use early maximal value.
-            days_late: int
-            if assignment.slip_group in slip_group_lateness:
-                days_late = get_days_late(slip_group_lateness[assignment.slip_group])
+        # Lateness is based on individual assignment if no slip group, else use early maximal value.
+        days_late: int
+        if assignment.slip_group in slip_group_lateness:
+            days_late = get_days_late(slip_group_lateness[assignment.slip_group])
+        else:
+            days_late = get_days_late(assignment.grade.lateness)
+
+        if days_late > 0:
+            late_multipliers: List[float]
+            if category.has_late_multiplier:
+                late_multipliers = LATE_MULTIPLIERS
             else:
-                days_late = get_days_late(assignment.grade.lateness)
+                # Empty array means immediately 0.0 upon late.
+                late_multipliers = []
 
-            if days_late > 0:
-                late_multipliers: List[float]
-                if category.has_late_multiplier:
-                    late_multipliers = LATE_MULTIPLIERS
-                else:
-                    # Empty array means immediately 0.0 upon late.
-                    late_multipliers = []
+            if days_late <= len(late_multipliers): # <= because zero-indexing.
+                multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
+            else:
+                # Student submitted past latest possible time.
+                multiplier = 0.0
+            assignment.grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
 
-                if days_late <= len(late_multipliers): # <= because zero-indexing.
-                    multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
-                else:
-                    # Student submitted past latest possible time.
-                    multiplier = 0.0
-                assignment.grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+    return [new_student]
 
-        return [new_student]
-
-    return apply
-
-def make_drops() -> Callable[[Student], List[Student]]:
-    """Returns a policy function that applies drops per categories.
+def drop_policy(student: Student) -> List[Student]:
+    """A policy function that applies drops per categories.
 
     Drops are applied by setting the dropped variable for all possible combinations of assignments to drop in each category.
 
-    :returns: An assignment drop policy function.
-    :rtype: callable
+    :param student: The input student.
+    :type student: Student
+    :returns: A list of students containing all possibilities of applying drops.
+    :rtype: list
     """
-    def apply(student: Student) -> List[Student]:
-        # Assignments in drop_assignments[i] have drop_possibilities[i].
-        drop_assignments: List[List[str]] = []
-        drop_possibilities: List[Tuple[Tuple[bool, ...], ...]] = []
+    # Assignments in drop_assignments[i] have drop_possibilities[i].
+    drop_assignments: List[List[str]] = []
+    drop_possibilities: List[Tuple[Tuple[bool, ...], ...]] = []
 
-        for category in student.categories.values():
-            # Get all ways to assign drops to assignments in the category.
-            drops = student.categories[category.name].drops
-            assignments_in_category = [assignment for assignment in student.assignments.values() if assignment.category == category.name]
-            category_possibility = tuple(i < drops for i in range(len(assignments_in_category)))
+    for category in student.categories.values():
+        # Get all ways to assign drops to assignments in the category.
+        drops = student.categories[category.name].drops
+        assignments_in_category = [assignment for assignment in student.assignments.values() if assignment.category == category.name]
+        category_possibility = tuple(i < drops for i in range(len(assignments_in_category)))
 
-            drop_assignments.append([assignment.name for assignment in assignments_in_category])
-            drop_possibilities.append(tuple(sorted(set(itertools.permutations(category_possibility)))))
+        drop_assignments.append([assignment.name for assignment in assignments_in_category])
+        drop_possibilities.append(tuple(sorted(set(itertools.permutations(category_possibility)))))
 
-        new_students: List[Student] = []
-        for drop_possibility in itertools.product(*drop_possibilities):
-            new_student = copy.deepcopy(student)
-            for category_index in range(len(drop_possibility)):
-                category_possibility = drop_possibility[category_index]
-                for assignment_index in range(len(category_possibility)):
-                    assignment = new_student.assignments[drop_assignments[category_index][assignment_index]]
-                    should_drop = category_possibility[assignment_index]
-                    if should_drop:
-                        assignment.grade.dropped = True
-                        assignment.grade.comments.append('Dropped')
-            new_students.append(new_student)
-        return new_students
-    return apply
+    new_students: List[Student] = []
+    for drop_possibility in itertools.product(*drop_possibilities):
+        new_student = copy.deepcopy(student)
+        for category_index in range(len(drop_possibility)):
+            category_possibility = drop_possibility[category_index]
+            for assignment_index in range(len(category_possibility)):
+                assignment = new_student.assignments[drop_assignments[category_index][assignment_index]]
+                should_drop = category_possibility[assignment_index]
+                if should_drop:
+                    assignment.grade.dropped = True
+                    assignment.grade.comments.append('Dropped')
+        new_students.append(new_student)
+    return new_students
 
 def make_clobbers(path: str, category_names: List[str], assignment_names: List[str], students: Dict[int, List[Student]]) -> Callable[[Student], List[Student]]:
     """Returns a policy function that applies clobbers based on the statistics in preliminary grade reports.
@@ -485,7 +483,7 @@ def make_clobbers(path: str, category_names: List[str], assignment_names: List[s
             ret.append([True, *r])
         return ret
 
-    def apply(student: Student) -> List[Student]:
+    def clobber_policy(student: Student) -> List[Student]:
         # category_names[i] has combinations category_combinations[i].
         if student.sid in category_clobbers:
             category_names = [name for name in category_clobbers[student.sid] if student.categories[name].override is None]
@@ -520,7 +518,7 @@ def make_clobbers(path: str, category_names: List[str], assignment_names: List[s
                     assignment.grade.comments.append(f'Clobbered by {assignment_clobber[0]}')
             new_students.append(new_student)
         return new_students
-    return apply
+    return clobber_policy
 
 # TODO Put this in another CSV or something.
 COMMENTS = {
@@ -537,7 +535,7 @@ def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Studen
     :returns: A comments policy function.
     :rtype: callable
     """
-    def apply(student: Student) -> List[Student]:
+    def comments_policy(student: Student) -> List[Student]:
         if student.sid not in comments:
             return [student]
         new_student = copy.deepcopy(student)
@@ -549,7 +547,7 @@ def make_comments(comments: Dict[int, Dict[str, List[str]]]) -> Callable[[Studen
             assignment_comments = comments[new_student.sid][assignment_name]
             assignment.grade.comments.extend(assignment_comments)
         return [new_student]
-    return apply
+    return comments_policy
 
 def generate_grade_reports(students: Dict[int, List[Student]]) -> Dict[int, GradeReport]:
     grade_reports: Dict[int, GradeReport] = {}
@@ -659,9 +657,9 @@ def main(args: argparse.Namespace) -> None:
         students = apply_policy(make_accommodations(accommodations_path), students)
     if extensions_path:
         students = apply_policy(make_extensions(extensions_path), students)
-    students = apply_policy(make_slip_days(), students)
-    students = apply_policy(make_late_multiplier(), students)
-    students = apply_policy(make_drops(), students)
+    students = apply_policy(slip_day_policy, students)
+    students = apply_policy(late_multiplier_policy, students)
+    students = apply_policy(drop_policy, students)
     if clobbers_path:
         students = apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
     students = apply_policy(make_comments(COMMENTS), students)
