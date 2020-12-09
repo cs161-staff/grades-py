@@ -69,8 +69,7 @@ class GradeReport:
         weighted: float
         comments: List[str] = field(default_factory=list)
 
-    sid: int
-    student_name: str
+    student: 'Student'
     total_grade: float = 0.0
     categories: Dict[str, 'GradeReport.CategoryEntry'] = field(default_factory=dict)
     assignments: Dict[str, 'GradeReport.AssignmentEntry'] = field(default_factory=dict)
@@ -81,9 +80,10 @@ class Student:
     name: str
     categories: Dict[str, Category]
     assignments: Dict[str, Assignment]
+    slip_days_used: int = 0
 
     def get_grade_report(self) -> GradeReport:
-        grade_report = GradeReport(self.sid, self.name)
+        grade_report = GradeReport(self)
         for category in self.categories.values():
             assignments_in_category = list(assignment for assignment in self.assignments.values() if assignment.category == category.name)
             category_numerator = 0.0 # Category-weighted grades on assignments

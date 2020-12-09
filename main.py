@@ -312,6 +312,7 @@ def make_slip_days() -> Callable[[Student], List[Student]]:
                     if slip_days == 0:
                         # Not applying slip days for this group for this possibility, so skip.
                         continue
+                    student_with_slip.slip_days_used += slip_days
                     for assignment in student_with_slip.assignments.values():
                         if assignment.slip_group == slip_group:
                             assignment.grade.lateness = max(assignment.grade.lateness - datetime.timedelta(days=slip_days), zero)
@@ -574,7 +575,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     grade_reports = generate_grade_reports(students)
 
     # Derive output rows.
-    header = ['SID', 'Name', 'Total Score', 'Percentile']
+    header = ['SID', 'Name', 'Total Score', 'Percentile', 'Slip Days Used']
     for category in categories.values():
         header.append(f'Category: {category.name} - Raw Score')
         header.append(f'Category: {category.name} - Adjusted Score')
@@ -588,7 +589,7 @@ def dump_students(students: Dict[int, List[Student]], assignments: Dict[str, Ass
     rows: List[List[Any]] = [header]
     for sid in students:
         grade_report = grade_reports[sid]
-        row: List[Any] = [grade_report.sid, grade_report.student_name, grade_report.total_grade, 0.0] # 0.0 is temporary percentile.
+        row: List[Any] = [grade_report.student.sid, grade_report.student.name, grade_report.total_grade, 0.0, grade_report.student.slip_days_used] # 0.0 is temporary percentile.
         absent = ('no grades found', 'no grades found', 'no grades found', 'no grades found')
         for category in categories.values():
             if category.name in grade_report.categories:
