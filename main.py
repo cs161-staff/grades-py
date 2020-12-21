@@ -432,7 +432,7 @@ def make_clobbers(path: str, category_names: List[str], assignment_names: List[s
     :rtype: callable
     """
     def zscore_clobber(source_score: float, source_mean: float, source_stdev: float, target_mean: float, target_stdev: float) -> float:
-        return target_mean + target_stdev * (source_score - source_stdev) / source_mean
+        return target_mean + target_stdev * (source_score - source_mean) / source_stdev
 
     prelim_reports = generate_grade_reports(students)
 
