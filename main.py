@@ -3,6 +3,7 @@ import copy
 import csv
 import datetime
 import itertools
+import math
 import statistics
 import sys
 from typing import Any, Callable, Dict, List, Optional, Set, TextIO, Tuple
@@ -262,37 +263,46 @@ def slip_day_policy(student: Student) -> List[Student]:
     :returns: A list of students containing all possibile ways of applying slip days.
     :rtype: list
     """
-    def get_slip_possibilities(num_assignments: int, slip_days: int) -> List[List[int]]:
-        # Basically np.meshgrid with max sum <= slip_days.
-        # TODO Optimize by removing unnecessary slip day possiblities (e.g. only using 2 when you can use 3).
-        if num_assignments == 0:
-            return [[]]
-        possibilities: List[List[int]] = []
-        for i in range(slip_days + 1):
-            # i is the number of slip days used for the first assignment.
-            rest = get_slip_possibilities(num_assignments - 1, slip_days - i)
-            rest = [[i] + possibility for possibility in rest]
-            possibilities.extend(rest)
-        return possibilities
+    def get_slip_possibilities(latenesses: Dict[int, datetime.timedelta], slip_days: int) -> List[Dict[int, int]]:
+        # Basically np.meshgrid with max sum <= slip_days. Optimizes by
+        # ensuring that no possibility is returned that applies more slip days
+        # than is needed for an assignment and by ensuring that the maximal
+        # number of slip days are used.
+        def helper(keys: List[int], index: int, days_left: int) -> List[Dict[int, int]]:
+            if index == len(latenesses):
+                return [{}]
+            key = keys[index]
+            possibilities: List[Dict[int, int]] = []
+            days_late = math.ceil(latenesses[key].total_seconds() / 86400)
+            for i in range(min(days_late, days_left) + 1):
+                # i is the number of slip days used for the first assignment.
+                rest = helper(keys, index + 1, days_left - i)
+                for possibility in rest:
+                    possibility[key] = i
+                possibilities.extend(rest)
+            max_days_used = max(sum(possibility.values()) for possibility in possibilities)
+            possibilities = [possibility for possibility in possibilities if sum(possibility.values()) == max_days_used]
+            return possibilities
+        return helper(list(latenesses.keys()), 0, slip_days)
 
     zero = datetime.timedelta(0)
 
     # slip_groups[i] have slip_possibilities[i].
     slip_groups: List[Set[int]] = []
-    slip_possibilities: List[List[List[int]]] = []
+    slip_possibilities: List[List[Dict[int, int]]] = []
 
     for category_name in student.categories:
         category = student.categories[category_name]
         # Get all slip groups that the student has late in the category.
-        category_slip_groups: Set[int] = set()
+        category_latenesses: Dict[int, datetime.timedelta] = {}
         for assignment in student.assignments.values():
             if assignment.category == category.name and assignment.slip_group != -1 and assignment.grade.lateness > zero:
-                category_slip_groups.add(assignment.slip_group)
+                category_latenesses[assignment.slip_group] = max(category_latenesses.get(assignment.slip_group, zero), assignment.grade.lateness)
 
         # Get all possible ways of applying slip days.
-        category_slip_possibilities = get_slip_possibilities(len(category_slip_groups), category.slip_days)
+        category_slip_possibilities = get_slip_possibilities(category_latenesses, category.slip_days)
 
-        slip_groups.append(category_slip_groups)
+        slip_groups.append(set(category_latenesses.keys()))
         slip_possibilities.append(category_slip_possibilities)
 
     new_students: List[Student] = [student]
@@ -305,11 +315,9 @@ def slip_day_policy(student: Student) -> List[Student]:
         student_with_slip = copy.deepcopy(student)
         for category_index in range(len(slip_possibility)):
             category_slip_groups = slip_groups[category_index]
-            category_slip_groups_list = list(category_slip_groups)
             category_slip_possibility = slip_possibility[category_index]
-            for i in range(len(category_slip_groups_list)):
-                slip_group = category_slip_groups_list[i]
-                slip_days = category_slip_possibility[i]
+            for slip_group in category_slip_groups:
+                slip_days = category_slip_possibility[slip_group]
                 if slip_days == 0:
                     # Not applying slip days for this group for this possibility, so skip.
                     continue
