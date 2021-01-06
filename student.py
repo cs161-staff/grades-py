@@ -24,7 +24,7 @@ class Category:
 class Assignment:
     @dataclass
     class Grade:
-        score: float
+        score: Optional[float]
         lateness: datetime.timedelta
         slip_days_applied: int = 0
         multipliers_applied: List[Multiplier] = field(default_factory=list)
@@ -33,6 +33,8 @@ class Assignment:
         comments: List[str] = field(default_factory=list)
 
         def get_score(self) -> float:
+            if self.score is None:
+                return 0.0
             score = self.score if self.override is None else self.override
             for multiplier in self.multipliers_applied:
                 score *= multiplier.multiplier
@@ -99,7 +101,7 @@ class Student:
             # AssignmentEntry objects with multipliers for adjusted score, weighted score, and cateogry numerator.
             for assignment in assignments_in_category:
                 grade = self.assignments[assignment.name].grade
-                assignment_raw_grade = grade.score / assignment.score_possible
+                assignment_raw_grade = grade.score if grade.score is not None else 0.0 / assignment.score_possible
                 assignment_adjusted_grade = grade.get_score() / assignment.score_possible
                 if not grade.dropped:
                     category_numerator += assignment_adjusted_grade * assignment.weight

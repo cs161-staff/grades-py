@@ -126,7 +126,7 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                 assignment_lateness_header = f'{assignment.name} - Lateness (H:M:S)'
                 assignment_max_points_header = f'{assignment.name} - Max Points'
 
-                score: float
+                score: Optional[float]
                 comments: List[str] = []
                 if assignment.name in row:
                     scorestr = row[assignment.name]
@@ -154,7 +154,7 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                         lateness = datetime.timedelta(0)
                 else:
                     # No column for assignment; assume 0.0.
-                    score = 0.0
+                    score = None
                     lateness = datetime.timedelta(0)
                     if assignment.name not in not_present_names:
                         not_present_names.add(assignment.name)
