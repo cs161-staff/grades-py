@@ -215,3 +215,8 @@ That being said, logical additions for future features include the following:
 - Manual grade overrides on individual assignments, with an optional comment
   - This handles individual clobber accommodations and other one-off grade
     overrides
+
+## Contributors
+
+- **Nicholas Ngai** (nicholas.ngai@berkeley.edu): Initial creation in Summer
+  2020, contributions through Fall 2020
