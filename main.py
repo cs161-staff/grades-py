@@ -532,6 +532,29 @@ def make_clobbers(path: str, category_names: List[str], assignment_names: List[s
         return new_students
     return clobber_policy
 
+def make_grade_assumption(assignment_name: str, score: float, comment: str) -> Callable[[Student], List[Student]]:
+    """Returns a policy function that assumes a grade for an assignment. This adds a comment denoting the assumption.
+
+    :param assignment_name: The name of the assignment whose grade to assume.
+    :type assignment_name: str
+    :param score: The assumed score.
+    :type score: float
+    :param comment: The comment to add to the grade.
+    :type comment: str
+    :returns: A grade assumption policy function.
+    :rtype: callable
+    """
+    def grade_assumption_policy(student: Student) -> List[Student]:
+        new_student = copy.deepcopy(student)
+        if assignment_name not in student.assignments:
+            # If not present, it wasn't present in assignments CSV.
+            raise RuntimeError(f'Grade assumption references unknown assignment {assignment_name}')
+        assignment = new_student.assignments[assignment_name]
+        assignment.grade.score = score
+        assignment.grade.comments.append(comment)
+        return [new_student]
+    return grade_assumption_policy
+
 # TODO Put this in another CSV or something.
 COMMENTS = {
     12345678: {
@@ -669,6 +692,8 @@ def main(args: argparse.Namespace) -> None:
         students = apply_policy(make_accommodations(accommodations_path), students)
     if extensions_path:
         students = apply_policy(make_extensions(extensions_path), students)
+    # The following line is useful for mid-semester grade reports and the like.
+    #students = apply_policy(make_grade_assumption('Homework 7', 31, 'Assumed 100%'), students)
     students = apply_policy(slip_day_policy, students)
     students = apply_policy(late_multiplier_policy, students)
     students = apply_policy(drop_policy, students)
