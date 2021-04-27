@@ -45,16 +45,7 @@ class Assignment:
     score_possible: float
     weight: float
     slip_group: int
-    _grade: Optional['Assignment.Grade'] = None
-
-    @property
-    def grade(self) -> 'Assignment.Grade':
-        assert self._grade is not None, 'Grade is not yet initialized'
-        return self._grade
-
-    @grade.setter
-    def grade(self, grade: 'Assignment.Grade') -> None:
-        self._grade = grade
+    grade: 'Assignment.Grade' = field(default_factory=lambda: Assignment.Grade(None, datetime.timedelta(0)))
 
 @dataclass
 class GradeReport:
