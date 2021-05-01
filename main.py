@@ -331,61 +331,68 @@ def slip_day_policy(student: Student) -> List[Student]:
 
     return new_students
 
-def late_multiplier_policy(student: Student) -> List[Student]:
-    """A policy function that applies late multipliers.
+def make_late_multiplier() -> Callable[[Student], List[Student]]:
+    late_zero_names: Set[str] = set()
+    def late_multiplier_policy(student: Student) -> List[Student]:
+        """A policy function that applies late multipliers.
 
-    Late multipliers are applied by appending to each grade's multipliers list.
+        Late multipliers are applied by appending to each grade's multipliers list.
 
-    :param student: The input student.
-    :type student: Student
-    :returns: A one-element list containing a student with late multipliers applied.
-    :rtype: list
-    """
-    zero = datetime.timedelta(0)
-    one = datetime.timedelta(days=1)
+        :param student: The input student.
+        :type student: Student
+        :returns: A one-element list containing a student with late multipliers applied.
+        :rtype: list
+        """
+        zero = datetime.timedelta(0)
+        one = datetime.timedelta(days=1)
 
-    def get_days_late(lateness: datetime.timedelta) -> int:
-        lateness = max(zero, lateness)
-        days_late = lateness.days
-        if lateness % one > LATE_GRACE:
-            days_late += 1
-        return days_late
+        def get_days_late(lateness: datetime.timedelta) -> int:
+            lateness = max(zero, lateness)
+            days_late = lateness.days
+            if lateness % one > LATE_GRACE:
+                days_late += 1
+            return days_late
 
-    new_student = copy.deepcopy(student)
+        new_student = copy.deepcopy(student)
 
-    # Build dict mapping slip groups to maximal number of days late.
-    slip_group_lateness: Dict[int, datetime.timedelta] = {}
-    for assignment in new_student.assignments.values():
-        if assignment.grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or assignment.grade.lateness > slip_group_lateness[assignment.slip_group]):
-            slip_group_lateness[assignment.slip_group] = assignment.grade.lateness
+        # Build dict mapping slip groups to maximal number of days late.
+        slip_group_lateness: Dict[int, datetime.timedelta] = {}
+        for assignment in new_student.assignments.values():
+            if assignment.grade.lateness > zero and assignment.slip_group != -1 and (assignment.slip_group not in slip_group_lateness or assignment.grade.lateness > slip_group_lateness[assignment.slip_group]):
+                slip_group_lateness[assignment.slip_group] = assignment.grade.lateness
 
-    # Apply lateness.
-    for assignment in new_student.assignments.values():
-        category = student.categories[assignment.category]
+        # Apply lateness.
+        for assignment in new_student.assignments.values():
+            category = student.categories[assignment.category]
 
-        # Lateness is based on individual assignment if no slip group, else use early maximal value.
-        days_late: int
-        if assignment.slip_group in slip_group_lateness:
-            days_late = get_days_late(slip_group_lateness[assignment.slip_group])
-        else:
-            days_late = get_days_late(assignment.grade.lateness)
-
-        if days_late > 0:
-            late_multipliers: List[float]
-            if category.has_late_multiplier:
-                late_multipliers = LATE_MULTIPLIERS
+            # Lateness is based on individual assignment if no slip group, else use early maximal value.
+            days_late: int
+            if assignment.slip_group in slip_group_lateness:
+                days_late = get_days_late(slip_group_lateness[assignment.slip_group])
             else:
-                # Empty array means immediately 0.0 upon late.
-                late_multipliers = []
+                days_late = get_days_late(assignment.grade.lateness)
 
-            if days_late <= len(late_multipliers): # <= because zero-indexing.
-                multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
-            else:
-                # Student submitted past latest possible time.
-                multiplier = 0.0
-            assignment.grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+            if days_late > 0:
+                late_multipliers: List[float]
+                if category.has_late_multiplier:
+                    late_multipliers = LATE_MULTIPLIERS
+                else:
+                    # Empty array means immediately 0.0 upon late.
+                    late_multipliers = []
+                    if assignment.name not in late_zero_names:
+                        late_zero_names.add(assignment.name)
+                        print(f'Warning: x0 late multiplier applied for {assignment.name}', file=sys.stderr)
 
-    return [new_student]
+                if days_late <= len(late_multipliers): # <= because zero-indexing.
+                    multiplier = late_multipliers[days_late - 1] # + 1 because zero-indexing.
+                else:
+                    # Student submitted past latest possible time.
+                    multiplier = 0.0
+                assignment.grade.multipliers_applied.append(Multiplier(multiplier, LATE_MULTIPLIER_DESC))
+
+        return [new_student]
+
+    return late_multiplier_policy
 
 def drop_policy(student: Student) -> List[Student]:
     """A policy function that applies drops per categories.
@@ -695,7 +702,7 @@ def main(args: argparse.Namespace) -> None:
     # The following line is useful for mid-semester grade reports and the like.
     #students = apply_policy(make_grade_assumption('Homework 7', 31, 'Assumed 100%'), students)
     students = apply_policy(slip_day_policy, students)
-    students = apply_policy(late_multiplier_policy, students)
+    students = apply_policy(make_late_multiplier(), students)
     students = apply_policy(drop_policy, students)
     if clobbers_path:
         students = apply_policy(make_clobbers(clobbers_path, list(categories), list(assignments), students), students)
