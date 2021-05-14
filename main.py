@@ -111,6 +111,7 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
     with open(grades_path) as grades_file:
         reader = csv.DictReader(grades_file)
         not_present_names: Set[str] = set()
+        perfect_score_names: Set[str] = set()
         for row in reader:
             try:
                 sid = int(row['SID'])
@@ -154,11 +155,22 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                     if assignment.name not in not_present_names:
                         not_present_names.add(assignment.name)
                         print(f'Warning: No grades present for {assignment.name}', file=sys.stderr)
+
+                # Track perfect scores. We do this because we expect some students to get a perfect score, so having no perfect scores could indicate an error in the inputs.
+                if score == assignment.score_possible:
+                    perfect_score_names.add(assignment.name)
+
                 student_assignments[assignment.name].grade = Assignment.Grade(score, lateness, comments=comments)
 
             # Copy this dict to each student.
             for student in students[sid]:
                 student.assignments = copy.deepcopy(student_assignments)
+
+        # Print assignments that are present but did not receive any perfect scores as a warning.
+        for assignment in assignments.values():
+            if assignment.name not in not_present_names and assignment.name not in perfect_score_names:
+                print(f'Warning: No perfect scores for {assignment.name}', file=sys.stderr)
+
     return students
 
 def apply_policy(policy: Callable[[Student], List[Student]], students: Dict[int, List[Student]]) -> Dict[int, List[Student]]:
