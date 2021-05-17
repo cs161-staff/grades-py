@@ -126,6 +126,7 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
             for assignment in student_assignments.values():
                 assignment_lateness_header = f'{assignment.name} - Lateness (H:M:S)'
 
+                # Get the score and lateness for the assignment.
                 score: Optional[float]
                 comments: List[str] = []
                 if assignment.name in row:
@@ -138,12 +139,6 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                         minutes = int(lateness_components[1])
                         seconds = int(lateness_components[2])
                         lateness = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
-
-                        if overrides is not None and sid in overrides and assignment.name in overrides[sid]:
-                            # Overridden.
-                            new_score = overrides[sid][assignment.name]
-                            comments.append(f'Overridden from {score}/{assignment.score_possible} to {new_score}/{assignment.score_possible}')
-                            score = new_score
                     else:
                         # Empty string score string means no submission; assume 0.0.
                         score = 0.0
@@ -155,6 +150,13 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                     if assignment.name not in not_present_names:
                         not_present_names.add(assignment.name)
                         print(f'Warning: No grades present for {assignment.name}', file=sys.stderr)
+
+                # Override the score if necessary.
+                if overrides is not None and sid in overrides and assignment.name in overrides[sid]:
+                    # Overridden.
+                    new_score = overrides[sid][assignment.name]
+                    comments.append(f'Overridden from {score}/{assignment.score_possible} to {new_score}/{assignment.score_possible}')
+                    score = new_score
 
                 # Track perfect scores. We do this because we expect some students to get a perfect score, so having no perfect scores could indicate an error in the inputs.
                 if score == assignment.score_possible:
