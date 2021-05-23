@@ -152,11 +152,13 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                         print(f'Warning: No grades present for {assignment.name}', file=sys.stderr)
 
                 # Override the score if necessary.
+                # TODO Overrides should probably have dates
                 if overrides is not None and sid in overrides and assignment.name in overrides[sid]:
                     # Overridden.
                     new_score = overrides[sid][assignment.name]
                     comments.append(f'Overridden from {score}/{assignment.score_possible} to {new_score}/{assignment.score_possible}')
                     score = new_score
+                    lateness = datetime.timedelta(0)
 
                 # Track perfect scores. We do this because we expect some students to get a perfect score, so having no perfect scores could indicate an error in the inputs.
                 if score == assignment.score_possible:
