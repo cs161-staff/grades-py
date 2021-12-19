@@ -15,6 +15,7 @@ LATE_MULTIPLIER_DESC = 'Late multiplier'
 LATE_MULTIPLIERS = [0.9, 0.8, 0.6]
 LATE_GRACE = datetime.timedelta(minutes=5)
 VERBOSE_COMMENTS = True
+ASSIGNMENT_NAME_FORMATS = ['{}', '{} - In-Person', '{} - Online']
 
 def import_categories(path: str) -> Dict[str, Category]:
     """Imports assignment categories the CSV file at the given path and initializes students' slip day and drop values.
@@ -124,13 +125,19 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
             # Create the base dict of student assignments.
             student_assignments = copy.deepcopy(assignments)
             for assignment in student_assignments.values():
-                assignment_lateness_header = f'{assignment.name} - Lateness (H:M:S)'
-
-                # Get the score and lateness for the assignment.
-                score: Optional[float]
+                score: Optional[float] = None
                 comments: List[str] = []
-                if assignment.name in row:
-                    scorestr = row[assignment.name]
+
+                # Loop through Gradescope possible assignment names that corresponds to the assignment.
+                for name_format in ASSIGNMENT_NAME_FORMATS:
+                    real_name = name_format.format(assignment.name)
+                    if real_name not in row:
+                        continue
+
+                    assignment_lateness_header = f'{real_name} - Lateness (H:M:S)'
+                    scorestr = row[real_name]
+
+                    # Get the score and lateness for the assignment.
                     if scorestr != '':
                         score = float(scorestr)
                         # Lateness formatted as HH:MM:SS.
@@ -139,13 +146,23 @@ def import_roster_and_grades(roster_path: str, grades_path: str, categories: Dic
                         minutes = int(lateness_components[1])
                         seconds = int(lateness_components[2])
                         lateness = datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+                        if assignment.name == 'Project 2 Autograder' or assignment.name == 'Project 2 Final Design Doc':
+                            if lateness >= datetime.timedelta(days=9):
+                                lateness -= datetime.timedelta(days=5)
+                            elif lateness >= datetime.timedelta(days=4):
+                                lateness = datetime.timedelta(days=4) - datetime.timedelta(seconds=1)
+
+                        # We found a real-number score, so we can break.
+                        break
                     else:
                         # Empty string score string means no submission; assume 0.0.
                         score = 0.0
                         lateness = datetime.timedelta(0)
-                else:
-                    # No column for assignment; assume 0.0.
-                    score = None
+                        # We found an empty string score, so mark it as 0.0, but don't break.
+
+                if score is None:
+                    # No column for assignment.
                     lateness = datetime.timedelta(0)
                     if assignment.name not in not_present_names:
                         not_present_names.add(assignment.name)
